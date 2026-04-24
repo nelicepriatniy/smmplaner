@@ -4,7 +4,7 @@ import { Suspense, useCallback, useState } from "react";
 import Link from "next/link";
 import { ContentCalendar } from "@/components/calendar/ContentCalendar";
 import { ClientFormDialog } from "@/components/clients/ClientFormDialog";
-import { mockClients, type ClientRecord, type PostDraftRecord } from "@/data/mockDb";
+import type { ClientRecord, PostDraftRecord } from "@/domain/smm";
 
 const btnPrimaryClass =
   "inline-flex shrink-0 items-center justify-center rounded-xl border border-transparent bg-[var(--surface-elevated)] px-4 py-2.5 text-[14px] font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--border)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]";
@@ -12,9 +12,18 @@ const btnPrimaryClass =
 type ClientDetailViewProps = {
   client: ClientRecord;
   clientPosts: PostDraftRecord[];
+  clients: ClientRecord[];
+  calendarDefaultYear: number;
+  calendarDefaultMonthIndex: number;
 };
 
-export function ClientDetailView({ client, clientPosts }: ClientDetailViewProps) {
+export function ClientDetailView({
+  client,
+  clientPosts,
+  clients,
+  calendarDefaultYear,
+  calendarDefaultMonthIndex,
+}: ClientDetailViewProps) {
   const [formOpen, setFormOpen] = useState(false);
   const [formSession, setFormSession] = useState(0);
 
@@ -83,7 +92,12 @@ export function ClientDetailView({ client, clientPosts }: ClientDetailViewProps)
                   </div>
                 }
               >
-                <ContentCalendar posts={clientPosts} clients={mockClients} />
+                <ContentCalendar
+                  posts={clientPosts}
+                  clients={clients}
+                  defaultYear={calendarDefaultYear}
+                  defaultMonthIndex={calendarDefaultMonthIndex}
+                />
               </Suspense>
             </div>
           </div>

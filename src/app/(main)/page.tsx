@@ -2,16 +2,29 @@ import { DashboardRecentActivity } from "@/components/dashboard/DashboardRecentA
 import { DashboardStatsRow } from "@/components/dashboard/DashboardStatsRow";
 import { DashboardUpcomingPosts } from "@/components/dashboard/DashboardUpcomingPosts";
 import {
-  getDashboardStats,
+  computeDashboardStats,
   getRecentActivities,
   getUpcomingScheduledPosts,
-  mockClients,
-} from "@/data/mockDb";
+} from "@/domain/smm";
+import {
+  listActivitiesForUser,
+  listClientsForUser,
+  listPostsForUser,
+  requireUserId,
+} from "@/lib/smm-data";
+import { getServerRefMs } from "@/lib/serverRefMs";
 
-export default function Home() {
-  const stats = getDashboardStats();
-  const upcoming = getUpcomingScheduledPosts(4);
-  const recentActivity = getRecentActivities(8);
+export default async function Home() {
+  const userId = await requireUserId();
+  const refMs = await getServerRefMs();
+  const [clients, posts, activityRows] = await Promise.all([
+    listClientsForUser(userId, refMs),
+    listPostsForUser(userId),
+    listActivitiesForUser(userId, 20, refMs),
+  ]);
+  const stats = computeDashboardStats(clients, posts, refMs);
+  const upcoming = getUpcomingScheduledPosts(posts, 4, refMs);
+  const recentActivity = getRecentActivities(activityRows, 8, refMs);
 
   return (
     <main className="w-full py-10 sm:py-12">
@@ -24,8 +37,8 @@ export default function Home() {
         </p>
       </header>
       <DashboardStatsRow stats={stats} />
-      <DashboardUpcomingPosts posts={upcoming} clients={mockClients} />
-      <DashboardRecentActivity activities={recentActivity} />
+      <DashboardUpcomingPosts posts={upcoming} clients={clients} />
+      <DashboardRecentActivity activities={recentActivity} refMs={refMs} />
     </main>
   );
 }

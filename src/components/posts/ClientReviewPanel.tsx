@@ -4,7 +4,7 @@ import { useState } from "react";
 import { InstagramPostPreview } from "@/components/posts/InstagramPostPreview";
 import { ClientPortalDiscussion } from "@/components/posts/ClientPortalDiscussion";
 import type { PostReviewComment } from "@/components/posts/postReviewTypes";
-import type { ClientRecord } from "@/data/mockDb";
+import type { ClientRecord } from "@/domain/smm";
 import type { PostType } from "@/types/postType";
 
 type ClientReviewPanelProps = {
@@ -16,6 +16,7 @@ type ClientReviewPanelProps = {
   firstComment: string;
   altText: string;
   initialDiscussion: PostReviewComment[];
+  refMs: number;
 };
 
 export function ClientReviewPanel({
@@ -27,6 +28,7 @@ export function ClientReviewPanel({
   firstComment,
   altText,
   initialDiscussion,
+  refMs,
 }: ClientReviewPanelProps) {
   const [decision, setDecision] = useState<"idle" | "approved" | "rejected">(
     "idle"
@@ -49,7 +51,7 @@ export function ClientReviewPanel({
         />
       </div>
 
-      <ClientPortalDiscussion initialComments={initialDiscussion} />
+      <ClientPortalDiscussion initialComments={initialDiscussion} refMs={refMs} />
 
       <div className="flex flex-col gap-3 pt-2 sm:flex-row">
         <button

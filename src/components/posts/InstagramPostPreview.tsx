@@ -1,8 +1,9 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect -- сброс слайда/раскрытия при смене медиа и подписи */
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { PostType } from "@/types/postType";
-import type { ClientRecord } from "@/data/mockDb";
+import type { ClientRecord } from "@/domain/smm";
 
 type InstagramPostPreviewProps = {
   postType: PostType;

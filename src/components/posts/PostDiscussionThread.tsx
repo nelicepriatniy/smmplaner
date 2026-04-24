@@ -6,22 +6,21 @@ import {
   formatTimeAgoRu,
   formatTimeAgoRuFrom,
 } from "@/components/posts/postReviewUtils";
-import {
-  discussionAuthorLabel,
-  MOCK_DISCUSSION_REF_MS,
-} from "@/data/mockDb";
+import { discussionAuthorLabel } from "@/domain/smm";
 
 type PostDiscussionThreadProps = {
   initialComments: PostReviewComment[];
+  refMs: number;
 };
 
-function formatMessageTime(c: PostReviewComment) {
+function formatMessageTime(c: PostReviewComment, refMs: number) {
   if (c.id.startsWith("live-")) return formatTimeAgoRu(c.createdAt);
-  return formatTimeAgoRuFrom(c.createdAt, MOCK_DISCUSSION_REF_MS);
+  return formatTimeAgoRuFrom(c.createdAt, refMs);
 }
 
 export function PostDiscussionThread({
   initialComments,
+  refMs,
 }: PostDiscussionThreadProps) {
   const [seedMessages] = useState<PostReviewComment[]>(() =>
     [...initialComments].sort((a, b) => a.createdAt - b.createdAt)
@@ -69,7 +68,7 @@ export function PostDiscussionThread({
                   </span>
                   <span aria-hidden> · </span>
                   <time dateTime={new Date(c.createdAt).toISOString()}>
-                    {formatMessageTime(c)}
+                    {formatMessageTime(c, refMs)}
                   </time>
                 </p>
                 <p

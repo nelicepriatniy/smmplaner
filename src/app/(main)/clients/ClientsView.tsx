@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import { ClientFormDialog } from "@/components/clients/ClientFormDialog";
 import { ClientCard } from "@/components/clients/ClientCard";
-import { mockClients } from "@/data/mockDb";
+import type { ClientRecord } from "@/domain/smm";
 
 const btnPrimaryClass =
   "inline-flex items-center justify-center rounded-xl border border-transparent bg-[var(--surface-elevated)] px-4 py-2.5 text-[14px] font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--border)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]";
@@ -16,8 +16,8 @@ function clientsWord(n: number) {
   return "клиентов";
 }
 
-export function ClientsView() {
-  const n = mockClients.length;
+export function ClientsView({ clients }: { clients: ClientRecord[] }) {
+  const n = clients.length;
   const [formOpen, setFormOpen] = useState(false);
   const [formSession, setFormSession] = useState(0);
 
@@ -56,11 +56,18 @@ export function ClientsView() {
         </div>
       </header>
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
-        {mockClients.map((c) => (
-          <ClientCard key={c.id} client={c} />
-        ))}
-      </div>
+      {n === 0 ? (
+        <p className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-8 text-center text-[14px] text-[var(--muted)]">
+          Клиентов пока нет. Запустите сид с демо-данными или добавьте клиента вручную (форма
+          пока без сохранения в БД).
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
+          {clients.map((c) => (
+            <ClientCard key={c.id} client={c} />
+          ))}
+        </div>
+      )}
     </main>
   );
 }

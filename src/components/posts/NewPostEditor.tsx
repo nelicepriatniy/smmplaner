@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
-import type { PostEditorInitialValues } from "@/data/mockDb";
-import { mockClients } from "@/data/mockDb";
+import type { ClientRecord, PostEditorInitialValues } from "@/domain/smm";
 import {
   isFeedLikePostType,
   POST_TYPE_OPTIONS,
@@ -17,6 +16,7 @@ import {
 } from "./postReviewUtils";
 
 type NewPostEditorProps = {
+  clients: ClientRecord[];
   /** Если задано — форма открывается с данными черновика (страница редактирования). */
   initialValues?: PostEditorInitialValues | null;
   /**
@@ -32,16 +32,17 @@ type NewPostEditorProps = {
 };
 
 function defaultClientId(
+  clients: ClientRecord[],
   initialValues: PostEditorInitialValues | null,
   duplicateFrom: PostEditorInitialValues | null,
   fromQuery: string | undefined
 ) {
   if (initialValues?.clientId) return initialValues.clientId;
   if (duplicateFrom?.clientId) return duplicateFrom.clientId;
-  if (fromQuery && mockClients.some((c) => c.id === fromQuery)) {
+  if (fromQuery && clients.some((c) => c.id === fromQuery)) {
     return fromQuery;
   }
-  return mockClients[0]?.id ?? "";
+  return clients[0]?.id ?? "";
 }
 
 function seedForNew(
@@ -54,6 +55,7 @@ function seedForNew(
 }
 
 export function NewPostEditor({
+  clients,
   initialValues = null,
   initialClientId,
   duplicateFrom = null,
@@ -62,7 +64,7 @@ export function NewPostEditor({
   const seed = seedForNew(initialValues, duplicateFrom);
 
   const [clientId, setClientId] = useState(() =>
-    defaultClientId(initialValues, duplicateFrom, initialClientId)
+    defaultClientId(clients, initialValues, duplicateFrom, initialClientId)
   );
   const [postType, setPostType] = useState<PostType>(
     () => seed?.postType ?? "feed"
@@ -109,8 +111,8 @@ export function NewPostEditor({
   }, [isEditMode]);
 
   const client = useMemo(
-    () => mockClients.find((c) => c.id === clientId) ?? null,
-    [clientId]
+    () => clients.find((c) => c.id === clientId) ?? null,
+    [clients, clientId]
   );
 
   const typeHint = useMemo(
@@ -163,7 +165,7 @@ export function NewPostEditor({
               value={clientId}
               onChange={(e) => setClientId(e.target.value)}
             >
-              {mockClients.map((c) => (
+              {clients.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.fullName} (@{c.instagramUsername})
                 </option>

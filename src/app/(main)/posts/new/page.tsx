@@ -5,11 +5,15 @@ import {
   normalizePublishSchedule,
 } from "@/components/posts/postReviewUtils";
 import {
-  getMockPostDraftById,
-  mockClients,
   postDraftToEditorInitial,
   type PostEditorInitialValues,
-} from "@/data/mockDb";
+} from "@/domain/smm";
+import { getServerRefMs } from "@/lib/serverRefMs";
+import {
+  getPostForUser,
+  listClientsForUser,
+  requireUserId,
+} from "@/lib/smm-data";
 
 export const metadata: Metadata = {
   title: "Новый пост — smmplaner",
@@ -20,35 +24,42 @@ type PageProps = {
   searchParams: Promise<{ client?: string; duplicateFrom?: string }>;
 };
 
-function validClientId(param: string | undefined): string | undefined {
-  if (typeof param !== "string" || !mockClients.some((c) => c.id === param)) {
+function validClientId(
+  clients: { id: string }[],
+  param: string | undefined
+): string | undefined {
+  if (typeof param !== "string" || !clients.some((c) => c.id === param)) {
     return undefined;
   }
   return param;
 }
 
-/** Копия поста для новой записи: тот же контент, публикация с дефолтного слота. */
 function toDuplicateFormValues(
-  sourcePostId: string
-): PostEditorInitialValues | null {
-  const draft = getMockPostDraftById(sourcePostId);
-  if (!draft) return null;
-  const base = postDraftToEditorInitial(draft);
-  const s = normalizePublishSchedule(getDefaultPublishSchedule());
-  return { ...base, publishDate: s.date, publishTime: s.time };
+  sourcePostId: string,
+  userId: string
+): Promise<PostEditorInitialValues | null> {
+  return getPostForUser(userId, sourcePostId).then((draft) => {
+    if (!draft) return null;
+    const base = postDraftToEditorInitial(draft);
+    const s = normalizePublishSchedule(getDefaultPublishSchedule());
+    return { ...base, publishDate: s.date, publishTime: s.time };
+  });
 }
 
 export default async function NewPostPage({ searchParams }: PageProps) {
+  const userId = await requireUserId();
+  const refMs = await getServerRefMs();
+  const clients = await listClientsForUser(userId, refMs);
   const { client: clientParam, duplicateFrom: duplicateFromId } =
     await searchParams;
 
   const duplicateFrom: PostEditorInitialValues | null =
     typeof duplicateFromId === "string"
-      ? toDuplicateFormValues(duplicateFromId)
+      ? await toDuplicateFormValues(duplicateFromId, userId)
       : null;
 
   const initialClientId =
-    duplicateFrom != null ? undefined : validClientId(clientParam);
+    duplicateFrom != null ? undefined : validClientId(clients, clientParam);
 
   const editorKey = duplicateFrom
     ? `dup-${duplicateFromId}`
@@ -71,6 +82,7 @@ export default async function NewPostPage({ searchParams }: PageProps) {
 
       <NewPostEditor
         key={editorKey}
+        clients={clients}
         initialClientId={initialClientId}
         duplicateFrom={duplicateFrom}
       />

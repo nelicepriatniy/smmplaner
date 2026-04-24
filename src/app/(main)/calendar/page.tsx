@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { mockClients, mockPostDrafts } from "@/data/mockDb";
+import { calendarAnchorFromPosts } from "@/domain/smm";
 import { CalendarWithClientFilter } from "./CalendarWithClientFilter";
+import { getServerRefMs } from "@/lib/serverRefMs";
+import {
+  listClientsForUser,
+  listPostsForUser,
+  requireUserId,
+} from "@/lib/smm-data";
 
 export const metadata: Metadata = {
   title: "Календарь — smmplaner",
@@ -14,21 +20,28 @@ type PageProps = {
 
 export default async function CalendarPage({ searchParams }: PageProps) {
   const { client: clientParam } = await searchParams;
+  const userId = await requireUserId();
+  const refMs = await getServerRefMs();
+  const [clients, allPosts] = await Promise.all([
+    listClientsForUser(userId, refMs),
+    listPostsForUser(userId),
+  ]);
 
   const filterClientId =
-    typeof clientParam === "string" &&
-    mockClients.some((c) => c.id === clientParam)
+    typeof clientParam === "string" && clients.some((c) => c.id === clientParam)
       ? clientParam
       : undefined;
 
-  const displayPosts = mockPostDrafts.filter((p) =>
+  const displayPosts = allPosts.filter((p) =>
     filterClientId ? p.clientId === filterClientId : true
   );
 
-  const filterOptions = mockClients.map((c) => ({
+  const filterOptions = clients.map((c) => ({
     id: c.id,
     label: `${c.fullName} (@${c.instagramUsername})`,
   }));
+
+  const anchor = calendarAnchorFromPosts(displayPosts);
 
   return (
     <main className="w-full py-8 sm:py-10">
@@ -37,7 +50,7 @@ export default async function CalendarPage({ searchParams }: PageProps) {
           Календарь
         </h1>
         <p className="mt-1.5 text-[14px] text-[var(--muted)]">
-          Слоты по дням: запланированные, опубликованные и черновики (демо-данные).
+          Слоты по дням: запланированные, опубликованные и черновики.
         </p>
       </header>
 
@@ -50,8 +63,10 @@ export default async function CalendarPage({ searchParams }: PageProps) {
       >
         <CalendarWithClientFilter
           posts={displayPosts}
-          clients={mockClients}
+          clients={clients}
           filterOptions={filterOptions}
+          defaultYear={anchor.year}
+          defaultMonthIndex={anchor.monthIndex}
         />
       </Suspense>
     </main>

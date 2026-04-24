@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import type { ClientRecord } from "@/data/mockDb";
+import type { ClientRecord } from "@/domain/smm";
 
 type ClientCardProps = {
   client: ClientRecord;

@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ClientReviewPanel } from "@/components/posts/ClientReviewPanel";
+import { getServerRefMs } from "@/lib/serverRefMs";
 import {
-  getMockPostDraftByClientReviewToken,
-  mockClients,
-} from "@/data/mockDb";
+  getClientRecordById,
+  getPostByClientReviewToken,
+} from "@/lib/smm-data";
 
 type PageProps = {
   params: Promise<{ token: string }>;
@@ -14,7 +15,7 @@ export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
   const { token } = await params;
-  const post = getMockPostDraftByClientReviewToken(token);
+  const post = await getPostByClientReviewToken(token);
   return {
     title: post ? "Согласование поста" : "Ссылка недействительна",
     description: "Просмотр поста и обсуждение с командой",
@@ -23,10 +24,11 @@ export async function generateMetadata({
 
 export default async function ClientReviewPage({ params }: PageProps) {
   const { token } = await params;
-  const post = getMockPostDraftByClientReviewToken(token);
+  const post = await getPostByClientReviewToken(token);
   if (!post) notFound();
 
-  const client = mockClients.find((c) => c.id === post.clientId) ?? null;
+  const client = await getClientRecordById(post.clientId);
+  const refMs = await getServerRefMs();
 
   return (
     <main className="min-h-dvh w-full bg-[var(--background)] px-4 py-8 sm:px-6 sm:py-10">
@@ -55,6 +57,7 @@ export default async function ClientReviewPage({ params }: PageProps) {
           firstComment={post.firstComment}
           altText={post.altText}
           initialDiscussion={post.discussion ?? []}
+          refMs={refMs}
         />
       </div>
     </main>

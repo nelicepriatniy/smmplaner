@@ -1,10 +1,6 @@
 import Link from "next/link";
 import { formatTimeAgoRuFrom } from "@/components/posts/postReviewUtils";
-import {
-  MOCK_DISCUSSION_REF_MS,
-  type ActivityKind,
-  type RecentActivityRecord,
-} from "@/data/mockDb";
+import type { ActivityKind, RecentActivityRecord } from "@/domain/smm";
 
 const KIND_META: Record<
   ActivityKind,
@@ -78,8 +74,11 @@ function activityHref(act: RecentActivityRecord): string | null {
 
 export function DashboardRecentActivity({
   activities,
+  refMs,
 }: {
   activities: RecentActivityRecord[];
+  /** Опорное «сейчас» для подписей вроде «5 мин назад». */
+  refMs: number;
 }) {
   return (
     <section className="mt-8 sm:mt-10" aria-labelledby="dash-activity-heading">
@@ -122,10 +121,7 @@ export function DashboardRecentActivity({
                       className="text-[12px] tabular-nums text-[var(--muted)]"
                       dateTime={new Date(act.createdAtMs).toISOString()}
                     >
-                      {formatTimeAgoRuFrom(
-                        act.createdAtMs,
-                        MOCK_DISCUSSION_REF_MS
-                      )}
+                      {formatTimeAgoRuFrom(act.createdAtMs, refMs)}
                     </time>
                   </div>
                   <p className="mt-1.5 text-[14px] font-medium leading-snug text-[var(--foreground)]">

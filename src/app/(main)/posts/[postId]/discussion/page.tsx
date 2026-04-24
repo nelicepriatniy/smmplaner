@@ -2,7 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PostDiscussionThread } from "@/components/posts/PostDiscussionThread";
-import { getMockPostDraftById, mockClients } from "@/data/mockDb";
+import { getServerRefMs } from "@/lib/serverRefMs";
+import {
+  getPostForUser,
+  listClientsForUser,
+  requireUserId,
+} from "@/lib/smm-data";
 
 type PageProps = {
   params: Promise<{ postId: string }>;
@@ -12,7 +17,8 @@ export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
   const { postId } = await params;
-  const draft = getMockPostDraftById(postId);
+  const userId = await requireUserId();
+  const draft = await getPostForUser(userId, postId);
   return {
     title: draft ? "Обсуждение поста — smmplaner" : "Пост не найден",
     description: "Переписка с клиентом по посту",
@@ -21,10 +27,15 @@ export async function generateMetadata({
 
 export default async function PostDiscussionPage({ params }: PageProps) {
   const { postId } = await params;
-  const post = getMockPostDraftById(postId);
+  const userId = await requireUserId();
+  const refMs = await getServerRefMs();
+  const [post, clients] = await Promise.all([
+    getPostForUser(userId, postId),
+    listClientsForUser(userId, refMs),
+  ]);
   if (!post) notFound();
 
-  const client = mockClients.find((c) => c.id === post.clientId);
+  const client = clients.find((c) => c.id === post.clientId);
 
   return (
     <main className="w-full max-w-2xl py-8 sm:py-10">
@@ -55,7 +66,10 @@ export default async function PostDiscussionPage({ params }: PageProps) {
         </p>
       </header>
 
-      <PostDiscussionThread initialComments={post.discussion ?? []} />
+      <PostDiscussionThread
+        initialComments={post.discussion ?? []}
+        refMs={refMs}
+      />
     </main>
   );
 }

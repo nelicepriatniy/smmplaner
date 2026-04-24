@@ -9,20 +9,24 @@ import { PostsClientFilter } from "@/components/posts/PostsClientFilter";
 import {
   discussionAuthorLabel,
   getLastDiscussionComment,
-  mockClients,
-  mockPostDrafts,
-  MOCK_DISCUSSION_REF_MS,
   POST_DRAFT_STATUS_LABELS,
+  type PostDraftRecord,
   type PostDraftStatus,
-} from "@/data/mockDb";
+} from "@/domain/smm";
 import { POST_TYPE_OPTIONS } from "@/types/postType";
+import { getServerRefMs } from "@/lib/serverRefMs";
+import {
+  listClientsForUser,
+  listPostsForUser,
+  requireUserId,
+} from "@/lib/smm-data";
 
 export const metadata: Metadata = {
   title: "Актуальные посты — smmplaner",
   description: "Запланированные и недавно созданные посты",
 };
 
-function postTypeLabel(value: (typeof mockPostDrafts)[number]["postType"]) {
+function postTypeLabel(value: PostDraftRecord["postType"]) {
   return POST_TYPE_OPTIONS.find((o) => o.value === value)?.label ?? value;
 }
 
@@ -68,30 +72,34 @@ type PageProps = {
 
 export default async function CurrentPostsPage({ searchParams }: PageProps) {
   const { client: clientParam } = await searchParams;
+  const userId = await requireUserId();
+  const refMs = await getServerRefMs();
+  const [clients, allPosts] = await Promise.all([
+    listClientsForUser(userId, refMs),
+    listPostsForUser(userId),
+  ]);
+
   const hdrs = await headers();
   const host = hdrs.get("x-forwarded-host") ?? hdrs.get("host") ?? "";
   const proto = hdrs.get("x-forwarded-proto") ?? "https";
   const siteOrigin = host ? `${proto}://${host}` : "";
 
-  const clientById = Object.fromEntries(mockClients.map((c) => [c.id, c]));
+  const clientById = Object.fromEntries(clients.map((c) => [c.id, c]));
 
   const filterClientId =
-    typeof clientParam === "string" &&
-    mockClients.some((c) => c.id === clientParam)
+    typeof clientParam === "string" && clients.some((c) => c.id === clientParam)
       ? clientParam
       : undefined;
 
-  const rows = [...mockPostDrafts]
-    .filter((p) =>
-      filterClientId ? p.clientId === filterClientId : true
-    )
+  const rows = [...allPosts]
+    .filter((p) => (filterClientId ? p.clientId === filterClientId : true))
     .sort(
       (a, b) =>
         new Date(scheduledAtIso(a.publishDate, a.publishTime)).getTime() -
-        new Date(scheduledAtIso(b.publishDate, b.publishTime)).getTime(),
+        new Date(scheduledAtIso(b.publishDate, b.publishTime)).getTime()
     );
 
-  const filterOptions = mockClients.map((c) => ({
+  const filterOptions = clients.map((c) => ({
     id: c.id,
     label: `${c.fullName} (@${c.instagramUsername})`,
   }));
@@ -103,7 +111,7 @@ export default async function CurrentPostsPage({ searchParams }: PageProps) {
           Актуальные посты
         </h1>
         <p className="mt-1.5 text-[14px] text-[var(--muted)]">
-          Черновики и запланированные публикации из демо-данных (как из БД).
+          Черновики и запланированные публикации из базы данных.
         </p>
       </header>
 
@@ -119,7 +127,7 @@ export default async function CurrentPostsPage({ searchParams }: PageProps) {
         <p className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-8 text-center text-[14px] text-[var(--muted)]">
           {filterClientId
             ? "У выбранного пользователя пока нет постов в этом списке."
-            : "Постов пока нет."}
+            : "Постов пока нет. Запустите сид с демо-данными или создайте пост."}
         </p>
       ) : null}
 
@@ -200,7 +208,7 @@ export default async function CurrentPostsPage({ searchParams }: PageProps) {
                           >
                             {formatTimeAgoRuFrom(
                               lastDiscussion.createdAt,
-                              MOCK_DISCUSSION_REF_MS
+                              refMs
                             )}
                           </time>
                         </p>

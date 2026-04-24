@@ -47,12 +47,22 @@ function Divider() {
   return <div className="my-4 h-px bg-[var(--border)]" aria-hidden />;
 }
 
-export function AppSidebar() {
+export type AppSidebarUser = {
+  email: string | null;
+  name?: string | null;
+  image?: string | null;
+};
+
+export function AppSidebar({ user }: { user: AppSidebarUser }) {
   const pathname = usePathname();
-  const displayName = "Аня Смирнова";
-  const role = "SMM Manager";
-  const avatarUrl: string | null = null;
+  const displayName =
+    user.name?.trim() ||
+    (user.email ? user.email.split("@")[0] : null) ||
+    "Пользователь";
+  const subtitle = user.email ?? "—";
+  const avatarUrl = user.image ?? null;
   const initial = displayName.trim().charAt(0).toUpperCase() || "?";
+  const accountActive = pathname === "/account";
 
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-dvh w-[260px] shrink-0 flex-col overflow-y-auto border-r border-[var(--border)] bg-[var(--surface)] px-4 pb-5 pt-6">
@@ -98,7 +108,15 @@ export function AppSidebar() {
       </nav>
 
       <div className="mt-auto border-t border-[var(--border)] pt-5">
-        <div className="flex items-center gap-3 rounded-xl px-2 py-2">
+        <Link
+          href="/account"
+          className={`flex items-center gap-3 rounded-xl px-2 py-2 outline-offset-2 transition-colors focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+            accountActive
+              ? "bg-[var(--accent-soft)]"
+              : "hover:bg-[var(--surface-elevated)]"
+          }`}
+          aria-current={accountActive ? "page" : undefined}
+        >
           {avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -120,9 +138,9 @@ export function AppSidebar() {
             <p className="truncate text-[14px] font-medium text-[var(--foreground)]">
               {displayName}
             </p>
-            <p className="truncate text-[12px] text-[var(--muted)]">{role}</p>
+            <p className="truncate text-[12px] text-[var(--muted)]">{subtitle}</p>
           </div>
-        </div>
+        </Link>
       </div>
     </aside>
   );

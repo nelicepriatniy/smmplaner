@@ -1,4 +1,4 @@
-import type { DashboardStat } from "@/data/mockDb";
+import type { DashboardStat } from "@/domain/smm";
 
 export function DashboardStatsRow({ stats }: { stats: DashboardStat[] }) {
   return (

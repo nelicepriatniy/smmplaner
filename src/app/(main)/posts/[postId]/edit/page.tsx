@@ -2,8 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { NewPostEditor } from "@/components/posts/NewPostEditor";
-import { getMockPostDraftById, postDraftToEditorInitial } from "@/data/mockDb";
+import { postDraftToEditorInitial } from "@/domain/smm";
 import { safeCalendarReturnTo } from "@/lib/safeReturnTo";
+import { getServerRefMs } from "@/lib/serverRefMs";
+import {
+  getPostForUser,
+  listClientsForUser,
+  requireUserId,
+} from "@/lib/smm-data";
 
 type PageProps = {
   params: Promise<{ postId: string }>;
@@ -14,7 +20,8 @@ export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
   const { postId } = await params;
-  const draft = getMockPostDraftById(postId);
+  const userId = await requireUserId();
+  const draft = await getPostForUser(userId, postId);
   return {
     title: draft ? "Редактирование поста — smmplaner" : "Пост не найден",
     description: "Редактирование черновика или запланированного поста",
@@ -23,9 +30,14 @@ export async function generateMetadata({
 
 export default async function EditPostPage({ params, searchParams }: PageProps) {
   const { postId } = await params;
+  const userId = await requireUserId();
   const { returnTo: returnToParam } = await searchParams;
   const backHref = safeCalendarReturnTo(returnToParam);
-  const draft = getMockPostDraftById(postId);
+  const refMs = await getServerRefMs();
+  const [draft, clients] = await Promise.all([
+    getPostForUser(userId, postId),
+    listClientsForUser(userId, refMs),
+  ]);
   if (!draft) notFound();
 
   const initialValues = postDraftToEditorInitial(draft);
@@ -60,7 +72,7 @@ export default async function EditPostPage({ params, searchParams }: PageProps) 
         </p>
       </header>
 
-      <NewPostEditor key={postId} initialValues={initialValues} />
+      <NewPostEditor key={postId} clients={clients} initialValues={initialValues} />
     </main>
   );
 }

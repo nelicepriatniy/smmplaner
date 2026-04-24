@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import type { ClientRecord, PostDraftRecord } from "@/data/mockDb";
+import type { ClientRecord, PostDraftRecord } from "@/domain/smm";
 import { POST_TYPE_OPTIONS } from "@/types/postType";
 
 function scheduledAtIso(date: string, time: string) {

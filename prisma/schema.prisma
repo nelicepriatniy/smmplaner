@@ -7,12 +7,116 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum PostDraftStatus {
+  draft
+  in_review
+  scheduled
+  published
+  rejected
+}
+
+enum PostContentType {
+  feed
+  photo
+  reels
+  stories
+}
+
+enum ReviewCommentSide {
+  self
+  client
+}
+
+enum ActivityKind {
+  client_comment
+  client_approval
+  client_rejection
+  post_published
+  client_added
+  post_scheduled
+}
+
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String   @map("password_hash")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String     @map("password_hash")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+  clients      Client[]
+  posts        Post[]
+  activities   Activity[]
 
   @@map("users")
+}
+
+model Client {
+  id                 String   @id @default(cuid())
+  userId             String   @map("user_id")
+  fullName           String   @map("full_name")
+  instagramUsername  String   @map("instagram_username")
+  /// JSON array of 1–2 sphere labels
+  activitySpheres    Json     @map("activity_spheres")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  posts Post[]
+
+  @@index([userId])
+  @@map("clients")
+}
+
+model Post {
+  id                 String           @id @default(cuid())
+  userId             String           @map("user_id")
+  clientId           String           @map("client_id")
+  status             PostDraftStatus
+  postType           PostContentType  @map("post_type")
+  caption            String           @db.Text
+  location           String           @default("")
+  firstComment       String           @default("") @map("first_comment")
+  altText            String           @default("") @map("alt_text")
+  imageUrls          Json             @map("image_urls")
+  publishDate        String           @map("publish_date")
+  publishTime        String           @map("publish_time")
+  createdAt          DateTime         @map("created_at")
+  clientReviewToken  String           @unique @map("client_review_token")
+
+  user       User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client     Client               @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  discussion PostReviewComment[]
+
+  @@index([userId])
+  @@index([clientId])
+  @@index([userId, publishDate])
+  @@map("posts")
+}
+
+model PostReviewComment {
+  id        String            @id @default(cuid())
+  postId    String            @map("post_id")
+  side      ReviewCommentSide
+  text      String            @db.Text
+  createdAt DateTime          @map("created_at")
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@map("post_review_comments")
+}
+
+model Activity {
+  id        String       @id @default(cuid())
+  userId    String       @map("user_id")
+  kind      ActivityKind
+  createdAt DateTime     @map("created_at")
+  title     String
+  detail    String?
+  clientId  String?      @map("client_id")
+  postId    String?      @map("post_id")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("activities")
 }

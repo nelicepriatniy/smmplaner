@@ -8,11 +8,8 @@ import {
   type ClientRecord,
   type PostDraftRecord,
   type PostDraftStatus,
-} from "@/data/mockDb";
+} from "@/domain/smm";
 import { getMonthGridCells, toLocalYmd } from "@/lib/contentCalendarGrid";
-/** Демо-якорь: апрель 2026 совпадает с сидами в mockDb. */
-const INITIAL_YEAR = 2026;
-const INITIAL_MONTH_INDEX = 3;
 
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"] as const;
 
@@ -48,12 +45,15 @@ function groupPostsByYmd(posts: PostDraftRecord[]) {
   return map;
 }
 
-function parseYmdFromSearch(sp: { get: (k: string) => string | null } | null) {
-  if (!sp) return { year: INITIAL_YEAR, monthIndex: INITIAL_MONTH_INDEX };
+function parseYmdFromSearch(
+  sp: { get: (k: string) => string | null } | null,
+  fallback: { year: number; monthIndex: number }
+) {
+  if (!sp) return fallback;
   const yq = sp.get("y");
   const mq = sp.get("m");
-  let year = INITIAL_YEAR;
-  let monthIndex = INITIAL_MONTH_INDEX;
+  let year = fallback.year;
+  let monthIndex = fallback.monthIndex;
   if (yq != null) {
     const n = Number.parseInt(yq, 10);
     if (Number.isFinite(n) && n >= 2000 && n < 2100) year = n;
@@ -68,23 +68,34 @@ function parseYmdFromSearch(sp: { get: (k: string) => string | null } | null) {
 export function ContentCalendar({
   posts,
   clients,
+  defaultYear,
+  defaultMonthIndex,
 }: {
   posts: PostDraftRecord[];
   clients: ClientRecord[];
+  defaultYear: number;
+  defaultMonthIndex: number;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [year, setYear] = useState(INITIAL_YEAR);
-  const [monthIndex, setMonthIndex] = useState(INITIAL_MONTH_INDEX);
+  const fallback = useMemo(
+    () => ({ year: defaultYear, monthIndex: defaultMonthIndex }),
+    [defaultYear, defaultMonthIndex]
+  );
+  const [year, setYear] = useState(defaultYear);
+  const [monthIndex, setMonthIndex] = useState(defaultMonthIndex);
 
   useLayoutEffect(() => {
     const yq = searchParams.get("y");
     const mq = searchParams.get("m");
     if (yq == null && mq == null) return;
-    const { year: y, monthIndex: m } = parseYmdFromSearch(searchParams);
+    const { year: y, monthIndex: m } = parseYmdFromSearch(searchParams, fallback);
+    // Синхронизация локального месяца с query (?y=&m=) при навигации/шаринге ссылки.
+    /* eslint-disable react-hooks/set-state-in-effect -- URL → state */
     setYear(y);
     setMonthIndex(m);
-  }, [searchParams]);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [searchParams, fallback]);
 
   const clientById = useMemo(
     () => Object.fromEntries(clients.map((c) => [c.id, c])),

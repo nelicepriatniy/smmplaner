@@ -6,23 +6,23 @@ import {
   formatTimeAgoRu,
   formatTimeAgoRuFrom,
 } from "@/components/posts/postReviewUtils";
-import { MOCK_DISCUSSION_REF_MS } from "@/data/mockDb";
-
 type ClientPortalDiscussionProps = {
   initialComments: PostReviewComment[];
+  refMs: number;
 };
 
 function portalAuthorLabel(side: PostReviewComment["side"]) {
   return side === "self" ? "Аня" : "Вы";
 }
 
-function formatMessageTime(c: PostReviewComment) {
+function formatMessageTime(c: PostReviewComment, refMs: number) {
   if (c.id.startsWith("live-")) return formatTimeAgoRu(c.createdAt);
-  return formatTimeAgoRuFrom(c.createdAt, MOCK_DISCUSSION_REF_MS);
+  return formatTimeAgoRuFrom(c.createdAt, refMs);
 }
 
 export function ClientPortalDiscussion({
   initialComments,
+  refMs,
 }: ClientPortalDiscussionProps) {
   const [seedMessages] = useState<PostReviewComment[]>(() =>
     [...initialComments].sort((a, b) => a.createdAt - b.createdAt)
@@ -70,7 +70,7 @@ export function ClientPortalDiscussion({
                   </span>
                   <span aria-hidden> · </span>
                   <time dateTime={new Date(c.createdAt).toISOString()}>
-                    {formatMessageTime(c)}
+                    {formatMessageTime(c, refMs)}
                   </time>
                 </p>
                 <p
