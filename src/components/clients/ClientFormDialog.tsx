@@ -253,6 +253,33 @@ function ClientFormBody({ mode, client, onDismiss, onSaved }: ClientFormBodyProp
             </div>
           </div>
 
+          {values.platform === "vk" ? (
+            <div className="rounded-xl border border-[color-mix(in_srgb,var(--accent)_28%,var(--border))] bg-[var(--surface-elevated)] px-3.5 py-3.5 sm:px-4">
+              <p className="mb-2 text-[13px] font-medium text-[var(--foreground)]">
+                Токен через VK ID
+              </p>
+              <p className="mb-3 text-[12px] leading-relaxed text-[var(--muted)]">
+                Ниже можно войти аккаунтом VK — access token подставится в поле «Access token» ниже по
+                форме. Нужны переменные{" "}
+                <code className="rounded bg-[var(--background)] px-1">NEXT_PUBLIC_VK_APP_ID</code> и{" "}
+                <code className="rounded bg-[var(--background)] px-1">
+                  NEXT_PUBLIC_VK_REDIRECT_URL
+                </code>{" "}
+                в <code className="rounded bg-[var(--background)] px-1">.env</code> /{" "}
+                <code className="rounded bg-[var(--background)] px-1">.env.local</code>, затем
+                перезапуск <code className="rounded bg-[var(--background)] px-1">npm run dev</code>.
+              </p>
+              <VkIdTokenButton
+                disabled={isPending}
+                onAccessToken={(token) => {
+                  setField("vkAccessToken", token);
+                  setStatus("idle");
+                  setErrorMessage("");
+                }}
+              />
+            </div>
+          ) : null}
+
           <div>
             <label
               htmlFor={`${formId}-name`}
@@ -549,15 +576,6 @@ function ClientFormBody({ mode, client, onDismiss, onSaved }: ClientFormBodyProp
                   </label>
                 </div>
               ) : null}
-
-              <VkIdTokenButton
-                disabled={isPending}
-                onAccessToken={(token) => {
-                  setField("vkAccessToken", token);
-                  setStatus("idle");
-                  setErrorMessage("");
-                }}
-              />
 
               <div>
                 <label
