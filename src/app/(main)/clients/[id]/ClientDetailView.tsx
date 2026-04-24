@@ -1,10 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Suspense, useCallback, useState } from "react";
+import { Suspense, useCallback, useState, useTransition } from "react";
 import Link from "next/link";
+import { deleteClientAction } from "@/app/(main)/clients/actions";
 import { ContentCalendar } from "@/components/calendar/ContentCalendar";
 import { ClientFormDialog } from "@/components/clients/ClientFormDialog";
+import { useAppNotifications } from "@/components/notifications/AppNotifications";
 import type { ClientRecord, PostDraftRecord } from "@/domain/smm";
 
 const btnPrimaryClass =
@@ -26,6 +28,8 @@ export function ClientDetailView({
   calendarDefaultMonthIndex,
 }: ClientDetailViewProps) {
   const router = useRouter();
+  const { confirm, toast } = useAppNotifications();
+  const [isDeleting, startDeleteTransition] = useTransition();
   const [formOpen, setFormOpen] = useState(false);
   const [formSession, setFormSession] = useState(0);
 
@@ -37,6 +41,28 @@ export function ClientDetailView({
   const closeForm = useCallback(() => {
     setFormOpen(false);
   }, []);
+
+  const removeClient = useCallback(() => {
+    void (async () => {
+      const ok = await confirm({
+        title: "Удалить клиента",
+        message: `Удалить «${client.fullName}»? Все посты этого клиента будут удалены безвозвратно.`,
+        confirmLabel: "Удалить",
+        danger: true,
+      });
+      if (!ok) return;
+      startDeleteTransition(async () => {
+        const res = await deleteClientAction(client.id);
+        if (!res.ok) {
+          toast({ message: res.error, variant: "error" });
+          return;
+        }
+        toast({ message: "Клиент удалён", variant: "success" });
+        router.push("/clients");
+        router.refresh();
+      });
+    })();
+  }, [client.fullName, client.id, confirm, router, toast]);
 
   const ig = client.instagramUsername;
   const igUrl = `https://www.instagram.com/${encodeURIComponent(ig)}/`;
@@ -240,6 +266,17 @@ export function ClientDetailView({
                 </dd>
               </div>
             </dl>
+          </div>
+
+          <div className="mt-10 w-full min-w-0 border-t border-[var(--border)] pt-8 sm:mt-12 sm:pt-10">
+            <button
+              type="button"
+              onClick={removeClient}
+              disabled={isDeleting}
+              className="rounded-xl border border-rose-500/45 bg-transparent px-5 py-2.5 text-[14px] font-semibold text-rose-200 transition-colors hover:bg-rose-950/35 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isDeleting ? "Удаление…" : "Удалить"}
+            </button>
           </div>
         </div>
       </section>

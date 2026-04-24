@@ -317,3 +317,44 @@ export async function updateClientAction(
     return { ok: false, error: "Не удалось обновить клиента." };
   }
 }
+
+export async function deleteClientAction(
+  clientId: string
+): Promise<ClientActionResult> {
+  const userId = await requireUserId();
+  if (!userId) return { ok: false, error: "Нужна авторизация." };
+
+  const existing = await prisma.client.findFirst({
+    where: { id: clientId, userId },
+    select: { id: true },
+  });
+  if (!existing) return { ok: false, error: "Клиент не найден." };
+
+  const postRows = await prisma.post.findMany({
+    where: { clientId, userId },
+    select: { id: true },
+  });
+
+  try {
+    await prisma.activity.updateMany({
+      where: { userId, clientId },
+      data: { clientId: null },
+    });
+    await prisma.client.delete({ where: { id: clientId } });
+
+    for (const p of postRows) {
+      revalidatePath(`/posts/${p.id}/edit`);
+      revalidatePath(`/posts/${p.id}/discussion`);
+    }
+    revalidatePath("/clients");
+    revalidatePath(`/clients/${clientId}`);
+    revalidatePath("/");
+    revalidatePath("/calendar");
+    revalidatePath("/posts/new");
+    revalidatePath("/posts/current");
+    return { ok: true };
+  } catch (e) {
+    console.error(e);
+    return { ok: false, error: "Не удалось удалить клиента." };
+  }
+}
