@@ -12,6 +12,7 @@ export function RegisterForm() {
   const router = useRouter();
   const emailId = useId();
   const passwordId = useId();
+  const passwordConfirmId = useId();
   const [state, formAction, isPending] = useActionState(registerAction, null);
 
   useEffect(() => {
@@ -77,6 +78,24 @@ export function RegisterForm() {
             <p className="mt-1.5 text-[12px] text-[var(--muted)]">
               Не короче 8 символов
             </p>
+          </div>
+          <div className="mt-5">
+            <label
+              htmlFor={passwordConfirmId}
+              className="text-[14px] font-medium text-[var(--foreground)]"
+            >
+              Повторите пароль
+            </label>
+            <input
+              id={passwordConfirmId}
+              name="passwordConfirm"
+              type="password"
+              autoComplete="new-password"
+              required
+              minLength={8}
+              disabled={isPending}
+              className={`mt-2 ${inputClass} disabled:cursor-not-allowed disabled:opacity-50`}
+            />
           </div>
           <button
             type="submit"

@@ -15,12 +15,18 @@ export async function registerAction(
 ): Promise<RegisterState> {
   const emailRaw = formData.get("email");
   const passwordRaw = formData.get("password");
+  const passwordConfirmRaw = formData.get("passwordConfirm");
   const email =
     typeof emailRaw === "string" ? emailRaw.trim().toLowerCase() : "";
   const password = typeof passwordRaw === "string" ? passwordRaw : "";
+  const passwordConfirm =
+    typeof passwordConfirmRaw === "string" ? passwordConfirmRaw : "";
 
-  if (!email || !password) {
-    return { error: "Укажите email и пароль" };
+  if (!email || !password || !passwordConfirm) {
+    return { error: "Укажите email, пароль и подтверждение" };
+  }
+  if (password !== passwordConfirm) {
+    return { error: "Пароли не совпадают" };
   }
   if (!isValidEmail(email)) {
     return { error: "Некорректный email" };

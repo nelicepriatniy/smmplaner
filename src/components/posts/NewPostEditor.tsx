@@ -4,9 +4,16 @@ import { useCallback, useEffect, useId, useMemo, useState, useTransition } from 
 import { useRouter } from "next/navigation";
 import {
   createDraftPostAction,
+  createScheduledPostAction,
+  deletePostAction,
+  setPostDraftOrScheduledAction,
   updatePostAction,
 } from "@/app/(main)/posts/actions";
-import type { ClientRecord, PostEditorInitialValues } from "@/domain/smm";
+import type {
+  ClientRecord,
+  PostDraftStatus,
+  PostEditorInitialValues,
+} from "@/domain/smm";
 import {
   isFeedLikePostType,
   POST_TYPE_OPTIONS,
@@ -24,6 +31,8 @@ type NewPostEditorProps = {
   clients: ClientRecord[];
   /** Редактирование существующего поста (вместе с initialValues). */
   existingPostId?: string;
+  /** Статус поста при редактировании (кнопки «черновик» / «чистовик»). */
+  existingPostStatus?: PostDraftStatus;
   /** Если задано — форма открывается с данными черновика (страница редактирования). */
   initialValues?: PostEditorInitialValues | null;
   /**
@@ -64,12 +73,14 @@ function seedForNew(
 export function NewPostEditor({
   clients,
   existingPostId,
+  existingPostStatus,
   initialValues = null,
   initialClientId,
   duplicateFrom = null,
 }: NewPostEditorProps) {
   const router = useRouter();
-  const [isSaving, startTransition] = useTransition();
+  const [isSaving, startSaveTransition] = useTransition();
+  const [isDeleting, startDeleteTransition] = useTransition();
   const [saveError, setSaveError] = useState("");
   const isEditMode = initialValues != null && Boolean(existingPostId);
   const seed = seedForNew(initialValues, duplicateFrom);
@@ -182,7 +193,7 @@ export function NewPostEditor({
       setSaveError("Выберите клиента.");
       return;
     }
-    startTransition(async () => {
+    startSaveTransition(async () => {
       const payload = buildPayload();
       if (isEditMode && existingPostId) {
         const res = await updatePostAction(existingPostId, payload);
@@ -209,7 +220,57 @@ export function NewPostEditor({
     existingPostId,
     isEditMode,
     router,
+    startSaveTransition,
   ]);
+
+  const saveNewPostAsScheduled = useCallback(() => {
+    setSaveError("");
+    if (!clientId || !clients.some((c) => c.id === clientId)) {
+      setSaveError("Выберите клиента.");
+      return;
+    }
+    startSaveTransition(async () => {
+      const res = await createScheduledPostAction(buildPayload());
+      if (!res.ok) {
+        setSaveError(res.error);
+        return;
+      }
+      if (res.postId) {
+        router.push(`/posts/${res.postId}/edit`);
+      }
+    });
+  }, [buildPayload, clientId, clients, router, startSaveTransition]);
+
+  const setPostLifecycle = useCallback(
+    (target: "draft" | "scheduled") => {
+      if (!existingPostId) return;
+      setSaveError("");
+      startSaveTransition(async () => {
+        const res = await setPostDraftOrScheduledAction(existingPostId, target);
+        if (!res.ok) {
+          setSaveError(res.error);
+          return;
+        }
+        router.refresh();
+      });
+    },
+    [existingPostId, router, startSaveTransition]
+  );
+
+  const removePost = useCallback(() => {
+    if (!existingPostId) return;
+    if (!window.confirm("Удалить этот пост? Действие необратимо.")) return;
+    setSaveError("");
+    startDeleteTransition(async () => {
+      const res = await deletePostAction(existingPostId);
+      if (!res.ok) {
+        setSaveError(res.error);
+        return;
+      }
+      router.push("/posts/current");
+      router.refresh();
+    });
+  }, [existingPostId, router, startDeleteTransition]);
 
   const canSave = clients.length > 0 && Boolean(clientId);
 
@@ -399,23 +460,62 @@ export function NewPostEditor({
 
         <div className="mt-8 flex flex-row flex-wrap items-center gap-3">
           {isEditMode ? (
-            <button
-              type="button"
-              onClick={savePost}
-              disabled={!canSave || isSaving}
-              className="rounded-xl bg-[var(--accent)] px-5 py-2.5 text-[14px] font-semibold text-[#0e1016] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isSaving ? "Сохранение…" : "Сохранить"}
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={savePost}
+                disabled={!canSave || isSaving || isDeleting}
+                className="rounded-xl bg-[var(--accent)] px-5 py-2.5 text-[14px] font-semibold text-[#0e1016] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isSaving ? "Сохранение…" : "Сохранить"}
+              </button>
+              {existingPostStatus === "draft" ? (
+                <button
+                  type="button"
+                  onClick={() => setPostLifecycle("scheduled")}
+                  disabled={isSaving || isDeleting}
+                  className="rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] px-5 py-2.5 text-[14px] font-semibold text-[var(--foreground)] transition-colors hover:bg-[var(--border)] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isSaving ? "Обновление…" : "В чистовик"}
+                </button>
+              ) : existingPostStatus !== undefined ? (
+                <button
+                  type="button"
+                  onClick={() => setPostLifecycle("draft")}
+                  disabled={isSaving || isDeleting}
+                  className="rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] px-5 py-2.5 text-[14px] font-semibold text-[var(--foreground)] transition-colors hover:bg-[var(--border)] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isSaving ? "Обновление…" : "Перенести в черновик"}
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={removePost}
+                disabled={isSaving || isDeleting}
+                className="rounded-xl border border-rose-500/45 bg-transparent px-5 py-2.5 text-[14px] font-semibold text-rose-200 transition-colors hover:bg-rose-950/35 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isDeleting ? "Удаление…" : "Удалить"}
+              </button>
+            </>
           ) : (
-            <button
-              type="button"
-              onClick={savePost}
-              disabled={!canSave || isSaving}
-              className="rounded-xl bg-[var(--accent)] px-5 py-2.5 text-[14px] font-semibold text-[#0e1016] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isSaving ? "Сохранение…" : "Сохранить в черновики"}
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={saveNewPostAsScheduled}
+                disabled={!canSave || isSaving || isDeleting}
+                className="rounded-xl bg-[var(--accent)] px-5 py-2.5 text-[14px] font-semibold text-[#0e1016] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isSaving ? "Сохранение…" : "Сохранить"}
+              </button>
+              <button
+                type="button"
+                onClick={savePost}
+                disabled={!canSave || isSaving || isDeleting}
+                className="rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] px-5 py-2.5 text-[14px] font-semibold text-[var(--foreground)] transition-colors hover:bg-[var(--border)] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isSaving ? "Сохранение…" : "Сохранить в черновики"}
+              </button>
+            </>
           )}
         </div>
       </section>

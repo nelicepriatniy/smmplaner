@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { PostContentType } from "@prisma/client";
+import type { PostContentType, PostDraftStatus } from "@prisma/client";
 import { auth } from "@/auth";
 import { newClientReviewToken } from "@/lib/clientReviewToken";
 import { prisma } from "@/lib/prisma";
@@ -43,8 +43,9 @@ function revalidatePostPaths(userId: string, postId: string, clientId: string) {
   revalidatePath(`/posts/${postId}/discussion`);
 }
 
-export async function createDraftPostAction(
-  payload: PostSavePayload
+async function createPostWithStatus(
+  payload: PostSavePayload,
+  status: PostDraftStatus
 ): Promise<PostActionResult> {
   const userId = await requireUserId();
   if (!userId) return { ok: false, error: "Нужна авторизация." };
@@ -62,7 +63,7 @@ export async function createDraftPostAction(
       data: {
         userId,
         clientId: payload.clientId,
-        status: "draft",
+        status,
         postType: payload.postType as PostContentType,
         caption: payload.caption,
         location: payload.location,
@@ -80,8 +81,27 @@ export async function createDraftPostAction(
     return { ok: true, postId: post.id };
   } catch (e) {
     console.error(e);
-    return { ok: false, error: "Не удалось создать черновик." };
+    return {
+      ok: false,
+      error:
+        status === "draft"
+          ? "Не удалось создать черновик."
+          : "Не удалось сохранить пост.",
+    };
   }
+}
+
+export async function createDraftPostAction(
+  payload: PostSavePayload
+): Promise<PostActionResult> {
+  return createPostWithStatus(payload, "draft");
+}
+
+/** Новый пост сразу как запланированный («чистовик»), не черновик. */
+export async function createScheduledPostAction(
+  payload: PostSavePayload
+): Promise<PostActionResult> {
+  return createPostWithStatus(payload, "scheduled");
 }
 
 export async function updatePostAction(
@@ -124,6 +144,75 @@ export async function updatePostAction(
   } catch (e) {
     console.error(e);
     return { ok: false, error: "Не удалось сохранить пост." };
+  }
+}
+
+/** Черновик → запланирован; иначе из любого статуса (кроме уже черновика) → черновик. */
+export async function setPostDraftOrScheduledAction(
+  postId: string,
+  target: "draft" | "scheduled"
+): Promise<PostActionResult> {
+  const userId = await requireUserId();
+  if (!userId) return { ok: false, error: "Нужна авторизация." };
+
+  const existing = await prisma.post.findFirst({
+    where: { id: postId, userId },
+  });
+  if (!existing) return { ok: false, error: "Пост не найден." };
+
+  if (target === "scheduled") {
+    if (existing.status !== "draft") {
+      return {
+        ok: false,
+        error: "В чистовик можно перевести только черновик.",
+      };
+    }
+    try {
+      await prisma.post.update({
+        where: { id: postId },
+        data: { status: "scheduled" },
+      });
+      revalidatePostPaths(userId, postId, existing.clientId);
+      return { ok: true, postId };
+    } catch (e) {
+      console.error(e);
+      return { ok: false, error: "Не удалось обновить статус." };
+    }
+  }
+
+  if (existing.status === "draft") {
+    return { ok: true, postId };
+  }
+  try {
+    await prisma.post.update({
+      where: { id: postId },
+      data: { status: "draft" },
+    });
+    revalidatePostPaths(userId, postId, existing.clientId);
+    return { ok: true, postId };
+  } catch (e) {
+    console.error(e);
+    return { ok: false, error: "Не удалось перенести в черновик." };
+  }
+}
+
+export async function deletePostAction(postId: string): Promise<PostActionResult> {
+  const userId = await requireUserId();
+  if (!userId) return { ok: false, error: "Нужна авторизация." };
+
+  const existing = await prisma.post.findFirst({
+    where: { id: postId, userId },
+    select: { id: true, clientId: true },
+  });
+  if (!existing) return { ok: false, error: "Пост не найден." };
+
+  try {
+    await prisma.post.delete({ where: { id: postId } });
+    revalidatePostPaths(userId, postId, existing.clientId);
+    return { ok: true };
+  } catch (e) {
+    console.error(e);
+    return { ok: false, error: "Не удалось удалить пост." };
   }
 }
 

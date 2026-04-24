@@ -76,6 +76,7 @@ export default async function EditPostPage({ params, searchParams }: PageProps) 
         key={postId}
         clients={clients}
         existingPostId={postId}
+        existingPostStatus={draft.status}
         initialValues={initialValues}
       />
     </main>
