@@ -42,12 +42,27 @@ async function exchangeCodeViaApi(body: {
   code_verifier: string;
   state: string;
 }): Promise<{ access_token: string }> {
-  const res = await fetch("/api/vk/oauth-exchange", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-    credentials: "same-origin",
-  });
+  const signal =
+    typeof AbortSignal !== "undefined" && "timeout" in AbortSignal
+      ? AbortSignal.timeout(25_000)
+      : undefined;
+  let res: Response;
+  try {
+    res = await fetch("/api/vk/oauth-exchange", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      credentials: "same-origin",
+      signal,
+    });
+  } catch (e) {
+    if (e instanceof Error && e.name === "AbortError") {
+      throw new Error(
+        "Превышено время ожидания (25 с): нет ответа от приложения. Если сервер не может достучаться до id.vk.ru, проверьте исходящий HTTPS с хостинга.",
+      );
+    }
+    throw e;
+  }
   let data: { access_token?: string; error?: string };
   try {
     data = (await res.json()) as { access_token?: string; error?: string };
@@ -62,6 +77,9 @@ async function exchangeCodeViaApi(body: {
   }
   return { access_token: data.access_token };
 }
+
+/** Singleton Auth в @vkid/sdk: после login() держит codeVerifier до обмена кода. */
+type VkIdAuthRuntime = { codeVerifier?: string };
 
 type VkIdTokenButtonProps = {
   /** Подставить access token в форму клиента ВК. */
@@ -156,16 +174,35 @@ export function VkIdTokenButton({ onAccessToken, disabled }: VkIdTokenButtonProp
               void (async () => {
                 if (cancelled) return;
                 setLocalError(null);
-                const p = payload as { code?: string; device_id?: string };
+                const p = payload as {
+                  code?: string;
+                  device_id?: string;
+                  state?: string;
+                };
                 if (!p?.code || !p?.device_id) {
                   setLocalError("VK ID: в ответе нет code или device_id.");
                   return;
                 }
-                const codeVerifier = readVkidSdkCookie("codeVerifier");
-                const state = readVkidSdkCookie("state");
-                if (!codeVerifier || !state) {
+                /**
+                 * state: SDK перед успехом вызывает clearStateCookie() — в document.cookie
+                 * его уже нет; нужное значение приходит в payload (см. AuthResponse.state).
+                 * code_verifier: cookie или память singleton Auth после login().
+                 */
+                const authRt = sdk.Auth as unknown as VkIdAuthRuntime;
+                const codeVerifier =
+                  readVkidSdkCookie("codeVerifier")?.trim() ||
+                  authRt.codeVerifier?.trim();
+                const state =
+                  p.state?.trim() || readVkidSdkCookie("state")?.trim();
+                if (!state) {
                   setLocalError(
-                    "Нет PKCE-cookies VK ID (codeVerifier/state). Откройте сайт по HTTPS — у VK ID cookies с флагом Secure; на http://localhost они не сохраняются.",
+                    "VK ID: в ответе нет state (ожидается после входа). Обновите страницу и попробуйте снова.",
+                  );
+                  return;
+                }
+                if (!codeVerifier) {
+                  setLocalError(
+                    "Нет PKCE code_verifier (cookie vkid_sdk:codeVerifier и внутреннее состояние SDK пусты). Обновите страницу и войдите снова; на http://localhost включите HTTPS — иначе Secure-cookie не сохранится.",
                   );
                   return;
                 }

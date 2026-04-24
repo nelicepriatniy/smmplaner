@@ -6,7 +6,8 @@ const VKID_HOST = "id.vk.ru";
 
 /**
  * Обмен authorization code на access_token на сервере (обход блокировок fetch к id.vk.ru из браузера).
- * Клиент передаёт PKCE code_verifier и state из cookies vkid_sdk:*.
+ * Клиент передаёт `state` из payload LOGIN_SUCCESS (cookie state SDK очищает до события) и
+ * `code_verifier` из cookie и/или из памяти singleton Auth после login().
  */
 export async function POST(req: Request) {
   const session = await auth();
@@ -35,7 +36,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         error:
-          "Нужны поля code, device_id, code_verifier и state (последние два — из cookies VK ID на вашем домене). Откройте сайт по HTTPS, иначе cookies могут не сохраниться.",
+          "Нужны поля code, device_id, code_verifier и state (state — из ответа VK ID после входа, не из cookie).",
       },
       { status: 400 }
     );
@@ -60,6 +61,11 @@ export async function POST(req: Request) {
   });
   const url = `https://${VKID_HOST}/oauth2/auth?${qs.toString()}`;
 
+  const vkSignal =
+    typeof AbortSignal !== "undefined" && "timeout" in AbortSignal
+      ? AbortSignal.timeout(20_000)
+      : undefined;
+
   let res: Response;
   try {
     res = await fetch(url, {
@@ -71,15 +77,19 @@ export async function POST(req: Request) {
       },
       body: new URLSearchParams({ code }),
       cache: "no-store",
+      signal: vkSignal,
     });
   } catch (e) {
+    const aborted =
+      e instanceof Error && e.name === "AbortError";
     console.error("[vk oauth-exchange] fetch to id.vk.ru failed", e);
     return NextResponse.json(
       {
-        error:
-          "Сервер не смог связаться с id.vk.ru. Проверьте исходящий HTTPS, DNS и что хостинг не режет внешние запросы.",
+        error: aborted
+          ? "Таймаут 20 с при запросе к id.vk.ru. Проверьте, что с сервера доступен HTTPS к VK (файрвол, DNS, маршрутизация)."
+          : "Сервер не смог связаться с id.vk.ru. Проверьте исходящий HTTPS, DNS и что хостинг не режет внешние запросы.",
       },
-      { status: 502 }
+      { status: aborted ? 504 : 502 }
     );
   }
 
