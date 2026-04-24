@@ -17,6 +17,12 @@ export default auth((request) => {
     if (pathname === "/login" || pathname === "/register") {
       return NextResponse.next();
     }
+    if (pathname.startsWith("/review/")) {
+      return NextResponse.next();
+    }
+    if (pathname.startsWith("/api/cron/")) {
+      return NextResponse.next();
+    }
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -28,6 +34,11 @@ export default auth((request) => {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|ico|png|jpg|jpeg|gif|webp)$).*)",
+    /*
+     * Не гоняем auth для статики и публичных путей.
+     * Иначе /uploads/…/*.bin|*.avif (и др.) попадают в middleware → гость получает редирект на /login,
+     * а браузер в <img> подставляет HTML — «картинки не грузятся».
+     */
+    "/((?!_next/static|_next/image|favicon.ico|uploads/|review/|.*\\.(?:svg|ico|png|jpg|jpeg|gif|webp|avif)$).*)",
   ],
 };

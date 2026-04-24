@@ -77,7 +77,7 @@ export function ClientReviewPanel({
         className="flex w-full min-w-0 max-w-full justify-center rounded-2xl border border-[#efefef] p-4"
         style={{ background: "#fafafa" }}
       >
-        {client?.platform === "telegram" ? (
+        {client?.platform === "telegram" || client?.platform === "vk" ? (
           <TelegramPostPreview
             client={client}
             imageUrls={imageUrls}

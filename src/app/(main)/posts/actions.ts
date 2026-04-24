@@ -7,6 +7,7 @@ import { getAppBaseUrl } from "@/lib/app-base-url";
 import { newClientReviewToken } from "@/lib/clientReviewToken";
 import { prisma } from "@/lib/prisma";
 import { sendPostToTelegramChat } from "@/lib/telegram-send";
+import { sendPostToVkWall } from "@/lib/vk-wall-send";
 import type { PostType } from "@/types/postType";
 
 export type PostActionResult =
@@ -157,8 +158,7 @@ export async function updatePostAction(
 }
 
 /**
- * Сохраняет поля поста из формы, отправляет в Telegram и ставит статус «опубликован».
- * Доступно только для клиентов с платформой Telegram (токен и chat id).
+ * Сохраняет поля поста из формы, отправляет в Telegram или ВКонтакте и ставит статус «опубликован».
  */
 export async function publishPostNowAction(
   postId: string,
@@ -184,80 +184,149 @@ export async function publishPostNowAction(
   });
   if (!client) return { ok: false, error: "Клиент не найден." };
 
-  if (client.platform !== "telegram") {
-    return {
-      ok: false,
-      error: "Мгновенная публикация пока доступна только для клиентов Telegram.",
-    };
-  }
-
-  const botToken = client.telegramBotToken?.trim();
-  const chatId = client.telegramChatId?.trim();
-  if (!botToken || !chatId) {
-    return {
-      ok: false,
-      error: "У клиента Telegram не заданы токен бота или ID чата.",
-    };
-  }
-
   const imageUrls = sanitizeImageUrlsForStorage(payload.imageUrls);
   const appBaseUrl = getAppBaseUrl();
 
-  const send = await sendPostToTelegramChat({
-    botToken,
-    chatId,
-    caption: payload.caption,
-    imageUrls,
-    appBaseUrl,
-  });
-
-  if (!send.ok) {
-    return { ok: false, error: send.error };
-  }
-
-  try {
-    await prisma.$transaction([
-      prisma.post.update({
-        where: { id: postId },
-        data: {
-          clientId: payload.clientId,
-          postType: payload.postType as PostContentType,
-          caption: payload.caption,
-          location: payload.location,
-          firstComment: payload.firstComment,
-          altText: payload.altText,
-          imageUrls,
-          publishDate: payload.publishDate,
-          publishTime: payload.publishTime,
-          status: "published",
-        },
-      }),
-      prisma.activity.create({
-        data: {
-          userId,
-          kind: "post_published",
-          createdAt: new Date(),
-          title: "Пост опубликован в Telegram",
-          detail: payload.caption.trim().slice(0, 200) || undefined,
-          postId,
-          clientId: payload.clientId,
-        },
-      }),
-    ]);
-
-    revalidatePostPaths(userId, postId, payload.clientId);
-    if (existing.clientId !== payload.clientId) {
-      revalidatePath(`/clients/${existing.clientId}`);
+  if (client.platform === "telegram") {
+    const botToken = client.telegramBotToken?.trim();
+    const chatId = client.telegramChatId?.trim();
+    if (!botToken || !chatId) {
+      return {
+        ok: false,
+        error: "У клиента Telegram не заданы токен бота или ID чата.",
+      };
     }
-    return { ok: true, postId };
-  } catch (e) {
-    console.error(e);
-    return {
-      ok: false,
-      error:
-        "Сообщение ушло в Telegram, но не удалось обновить статус в базе. Проверьте пост вручную.",
-    };
+
+    const send = await sendPostToTelegramChat({
+      botToken,
+      chatId,
+      caption: payload.caption,
+      imageUrls,
+      appBaseUrl,
+    });
+
+    if (!send.ok) {
+      return { ok: false, error: send.error };
+    }
+
+    try {
+      await prisma.$transaction([
+        prisma.post.update({
+          where: { id: postId },
+          data: {
+            clientId: payload.clientId,
+            postType: payload.postType as PostContentType,
+            caption: payload.caption,
+            location: payload.location,
+            firstComment: payload.firstComment,
+            altText: payload.altText,
+            imageUrls,
+            publishDate: payload.publishDate,
+            publishTime: payload.publishTime,
+            status: "published",
+          },
+        }),
+        prisma.activity.create({
+          data: {
+            userId,
+            kind: "post_published",
+            createdAt: new Date(),
+            title: "Пост опубликован в Telegram",
+            detail: payload.caption.trim().slice(0, 200) || undefined,
+            postId,
+            clientId: payload.clientId,
+          },
+        }),
+      ]);
+
+      revalidatePostPaths(userId, postId, payload.clientId);
+      if (existing.clientId !== payload.clientId) {
+        revalidatePath(`/clients/${existing.clientId}`);
+      }
+      return { ok: true, postId };
+    } catch (e) {
+      console.error(e);
+      return {
+        ok: false,
+        error:
+          "Сообщение ушло в Telegram, но не удалось обновить статус в базе. Проверьте пост вручную.",
+      };
+    }
   }
+
+  if (client.platform === "vk") {
+    const token = client.vkAccessToken?.trim();
+    const ownerRaw = client.vkOwnerId?.trim();
+    if (!token || !ownerRaw) {
+      return {
+        ok: false,
+        error: "У клиента ВКонтакте не заданы access token или owner_id стены.",
+      };
+    }
+
+    const send = await sendPostToVkWall({
+      accessToken: token,
+      ownerIdStr: ownerRaw,
+      fromGroup: client.vkFromGroup,
+      message: payload.caption,
+      imageUrls,
+      appBaseUrl,
+    });
+
+    if (!send.ok) {
+      return { ok: false, error: send.error };
+    }
+
+    try {
+      await prisma.$transaction([
+        prisma.post.update({
+          where: { id: postId },
+          data: {
+            clientId: payload.clientId,
+            postType: payload.postType as PostContentType,
+            caption: payload.caption,
+            location: payload.location,
+            firstComment: payload.firstComment,
+            altText: payload.altText,
+            imageUrls,
+            publishDate: payload.publishDate,
+            publishTime: payload.publishTime,
+            status: "published",
+          },
+        }),
+        prisma.activity.create({
+          data: {
+            userId,
+            kind: "post_published",
+            createdAt: new Date(),
+            title: "Пост опубликован во ВКонтакте",
+            detail: payload.caption.trim().slice(0, 200) || undefined,
+            postId,
+            clientId: payload.clientId,
+          },
+        }),
+      ]);
+
+      revalidatePostPaths(userId, postId, payload.clientId);
+      if (existing.clientId !== payload.clientId) {
+        revalidatePath(`/clients/${existing.clientId}`);
+      }
+      return { ok: true, postId };
+    } catch (e) {
+      console.error(e);
+      return {
+        ok: false,
+        error:
+          "Запись ушла во ВКонтакте, но не удалось обновить статус в базе. Проверьте стену вручную.",
+      };
+    }
+  }
+
+  return {
+    ok: false,
+    error:
+      "Мгновенная публикация доступна только для клиентов Telegram и ВКонтакте.",
+  };
 }
 
 /** Черновик → запланирован; иначе из любого статуса (кроме уже черновика) → черновик. */

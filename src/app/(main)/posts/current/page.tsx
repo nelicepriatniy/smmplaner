@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Image from "next/image";
+import { isPublicUploadImageSrc } from "@/lib/media-display";
 import Link from "next/link";
 import { Suspense } from "react";
 import { PostClientReviewLink } from "@/components/posts/PostClientReviewLink";
@@ -156,6 +157,7 @@ export default async function CurrentPostsPage({ searchParams }: PageProps) {
                       fill
                       className="object-cover"
                       sizes="88px"
+                      unoptimized={isPublicUploadImageSrc(thumb)}
                     />
                   ) : null}
                 </div>

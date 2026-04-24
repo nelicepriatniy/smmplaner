@@ -26,7 +26,7 @@ export function getLastDiscussionComment(
   return [...discussion].sort((a, b) => a.createdAt - b.createdAt).at(-1);
 }
 
-export type ClientPlatform = "instagram" | "telegram";
+export type ClientPlatform = "instagram" | "telegram" | "vk";
 
 export type ClientRecord = {
   id: string;
@@ -46,6 +46,11 @@ export type ClientRecord = {
   telegramChatId?: string | null;
   /** В БД есть токен бота; сам токен в UI не передаётся. */
   hasTelegramBotToken?: boolean;
+  /** owner_id для wall.post (отрицательный — группа). */
+  vkOwnerId?: string | null;
+  vkFromGroup?: boolean;
+  /** В БД сохранён токен ВК; сам токен в UI не передаётся. */
+  hasVkAccessToken?: boolean;
 };
 
 /** Подпись клиента в селектах и фильтрах. */
@@ -55,6 +60,12 @@ export function clientSelectLabel(client: ClientRecord): string {
     return chat
       ? `${client.fullName} (Telegram, чат ${chat})`
       : `${client.fullName} (Telegram)`;
+  }
+  if (client.platform === "vk") {
+    const wall = client.vkOwnerId?.trim();
+    return wall
+      ? `${client.fullName} (ВКонтакте, стена ${wall})`
+      : `${client.fullName} (ВКонтакте)`;
   }
   return `${client.fullName} (@${client.instagramUsername})`;
 }
@@ -66,13 +77,14 @@ export function clientCalendarShortHandle(
 ): string {
   if (!client) return fallbackId;
   if (client.platform === "telegram") return client.telegramChatId?.trim() || "TG";
+  if (client.platform === "vk") return client.vkOwnerId?.trim() || "VK";
   return client.instagramUsername;
 }
 
 /** Имя в превью поста (строка перед текстом подписи). */
 export function postPreviewAuthorUsername(client: ClientRecord | null): string {
   if (!client) return "client";
-  if (client.platform === "telegram") {
+  if (client.platform === "telegram" || client.platform === "vk") {
     const name = client.fullName.trim();
     if (name.length <= 24) return name;
     return `${name.slice(0, 21)}…`;

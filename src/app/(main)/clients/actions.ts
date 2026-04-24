@@ -6,9 +6,13 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
 const TG_INSTAGRAM_PLACEHOLDER = "telegram";
+const VK_INSTAGRAM_PLACEHOLDER = "vk";
 
 function parsePlatform(raw: string): DbClientPlatform {
-  return raw.toLowerCase() === "telegram" ? "telegram" : "instagram";
+  const x = raw.toLowerCase();
+  if (x === "telegram") return "telegram";
+  if (x === "vk") return "vk";
+  return "instagram";
 }
 
 export type ClientActionResult = { ok: true } | { ok: false; error: string };
@@ -21,6 +25,27 @@ function parseActivitySpheres(raw: string): string[] {
     .slice(0, 2);
   if (parts.length === 0) return ["—"];
   return parts;
+}
+
+function parseVkWallFromForm(formData: FormData):
+  | { ok: true; vkOwnerId: string; vkFromGroup: boolean }
+  | { ok: false; error: string } {
+  const wallKind =
+    String(formData.get("vkWallKind") ?? "group").toLowerCase() === "user"
+      ? "user"
+      : "group";
+  const idDigits = String(formData.get("vkWallEntityId") ?? "").replace(/\D/g, "");
+  if (!idDigits) {
+    return {
+      ok: false,
+      error:
+        "Для ВКонтакте укажите числовой ID: для группы — из ссылки club123… или public…, для личной стены — числовой id пользователя.",
+    };
+  }
+  const vkOwnerId = wallKind === "group" ? `-${idDigits}` : idDigits;
+  const vkFromGroup =
+    wallKind === "group" && String(formData.get("vkFromGroup") ?? "") === "on";
+  return { ok: true, vkOwnerId, vkFromGroup };
 }
 
 async function requireUserId(): Promise<string | null> {
@@ -52,6 +77,9 @@ export async function createClientAction(
   let businessAccountConfirmed: boolean;
   let telegramBotToken: string | null;
   let telegramChatId: string | null;
+  let vkAccessToken: string | null;
+  let vkOwnerId: string | null;
+  let vkFromGroup: boolean;
 
   if (platform === "telegram") {
     telegramBotToken = String(formData.get("telegramBotToken") ?? "").trim() || null;
@@ -64,6 +92,25 @@ export async function createClientAction(
     facebookPageId = null;
     pageAccessToken = null;
     businessAccountConfirmed = false;
+    vkAccessToken = null;
+    vkOwnerId = null;
+    vkFromGroup = false;
+  } else if (platform === "vk") {
+    const vk = parseVkWallFromForm(formData);
+    if (!vk.ok) return { ok: false, error: vk.error };
+    vkAccessToken = String(formData.get("vkAccessToken") ?? "").trim() || null;
+    if (!vkAccessToken) {
+      return { ok: false, error: "Для ВКонтакте укажите access token." };
+    }
+    vkOwnerId = vk.vkOwnerId;
+    vkFromGroup = vk.vkFromGroup;
+    instagramUsername = VK_INSTAGRAM_PLACEHOLDER;
+    instagramBusinessId = null;
+    facebookPageId = null;
+    pageAccessToken = null;
+    businessAccountConfirmed = false;
+    telegramBotToken = null;
+    telegramChatId = null;
   } else {
     instagramUsername = String(formData.get("instagramUsername") ?? "")
       .trim()
@@ -80,12 +127,17 @@ export async function createClientAction(
     businessAccountConfirmed = formData.get("businessAccountConfirmed") === "on";
     telegramBotToken = null;
     telegramChatId = null;
+    vkAccessToken = null;
+    vkOwnerId = null;
+    vkFromGroup = false;
   }
 
   const activityDetail =
     platform === "telegram"
       ? `${fullName} (Telegram, чат ${telegramChatId})`
-      : `${fullName} (@${instagramUsername})`;
+      : platform === "vk"
+        ? `${fullName} (ВКонтакте, стена ${vkOwnerId})`
+        : `${fullName} (@${instagramUsername})`;
 
   try {
     const client = await prisma.client.create({
@@ -102,6 +154,9 @@ export async function createClientAction(
         businessAccountConfirmed,
         telegramBotToken,
         telegramChatId,
+        vkAccessToken,
+        vkOwnerId,
+        vkFromGroup,
       },
     });
 
@@ -168,6 +223,15 @@ export async function updateClientAction(
     instagramBusinessId = null;
     facebookPageId = null;
     businessAccountConfirmed = false;
+  } else if (platform === "vk") {
+    const vk = parseVkWallFromForm(formData);
+    if (!vk.ok) return { ok: false, error: vk.error };
+    telegramChatId = null;
+    instagramUsername =
+      existing.platform === "vk" ? existing.instagramUsername : VK_INSTAGRAM_PLACEHOLDER;
+    instagramBusinessId = null;
+    facebookPageId = null;
+    businessAccountConfirmed = false;
   } else {
     instagramUsername = String(formData.get("instagramUsername") ?? "")
       .trim()
@@ -185,6 +249,7 @@ export async function updateClientAction(
 
   const pageAccessTokenRaw = String(formData.get("pageAccessToken") ?? "").trim();
   const telegramBotTokenRaw = String(formData.get("telegramBotToken") ?? "").trim();
+  const vkAccessTokenRaw = String(formData.get("vkAccessToken") ?? "").trim();
 
   const data: Prisma.ClientUpdateInput = {
     fullName,
@@ -197,19 +262,41 @@ export async function updateClientAction(
     businessAccountConfirmed,
     telegramChatId,
   };
+
   if (platform === "instagram") {
     if (pageAccessTokenRaw) {
       data.pageAccessToken = pageAccessTokenRaw;
     }
     data.telegramBotToken = null;
-  } else {
+    data.vkAccessToken = null;
+    data.vkOwnerId = null;
+    data.vkFromGroup = false;
+  } else if (platform === "telegram") {
     data.pageAccessToken = null;
+    data.vkAccessToken = null;
+    data.vkOwnerId = null;
+    data.vkFromGroup = false;
     if (telegramBotTokenRaw) {
       data.telegramBotToken = telegramBotTokenRaw;
     } else if (!existing.telegramBotToken?.trim()) {
       return {
         ok: false,
         error: "Укажите токен бота от @BotFather.",
+      };
+    }
+  } else {
+    const vk = parseVkWallFromForm(formData);
+    if (!vk.ok) return { ok: false, error: vk.error };
+    data.pageAccessToken = null;
+    data.telegramBotToken = null;
+    data.vkOwnerId = vk.vkOwnerId;
+    data.vkFromGroup = vk.vkFromGroup;
+    if (vkAccessTokenRaw) {
+      data.vkAccessToken = vkAccessTokenRaw;
+    } else if (!existing.vkAccessToken?.trim()) {
+      return {
+        ok: false,
+        error: "Укажите access token ВКонтакте.",
       };
     }
   }
@@ -223,6 +310,7 @@ export async function updateClientAction(
     revalidatePath(`/clients/${clientId}`);
     revalidatePath("/");
     revalidatePath("/calendar");
+    revalidatePath("/posts/new");
     return { ok: true };
   } catch (e) {
     console.error(e);

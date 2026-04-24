@@ -1,15 +1,8 @@
-import type { StaticImageData } from "next/image";
-import logo from "@/assets/img/logo.svg";
-
-function importedImageUrl(mod: string | StaticImageData): string {
-  return typeof mod === "string" ? mod : mod.src;
-}
-
 export function LogoMark() {
   return (
-    // eslint-disable-next-line @next/next/no-img-element -- SVG из ассетов, src из StaticImageData
+    // eslint-disable-next-line @next/next/no-img-element -- тот же SVG, что и фавикон (/logo.svg)
     <img
-      src={importedImageUrl(logo)}
+      src="/logo.svg"
       alt=""
       width={36}
       height={36}

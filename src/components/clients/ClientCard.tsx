@@ -11,12 +11,19 @@ export function ClientCard({ client }: ClientCardProps) {
   const router = useRouter();
   const ig = client.instagramUsername;
   const igUrl = `https://www.instagram.com/${encodeURIComponent(ig)}/`;
+  const vkWall = client.vkOwnerId?.trim();
+  const vkSubtitle =
+    client.platform === "vk"
+      ? vkWall
+        ? `ВКонтакте · стена ${vkWall}`
+        : "ВКонтакте"
+      : null;
   const subtitle =
     client.platform === "telegram"
       ? client.telegramChatId?.trim()
         ? `Telegram · чат ${client.telegramChatId.trim()}`
         : "Telegram"
-      : null;
+      : vkSubtitle;
 
   const goToClient = () => {
     router.push(`/clients/${client.id}`);
@@ -39,7 +46,7 @@ export function ClientCard({ client }: ClientCardProps) {
       <h2 className="text-[16px] font-semibold leading-snug text-[var(--foreground)]">
         {client.fullName}
       </h2>
-      {client.platform === "telegram" ? (
+      {client.platform === "telegram" || client.platform === "vk" ? (
         <p className="mt-1.5 text-[13px] text-[var(--muted)]">{subtitle}</p>
       ) : (
         <a

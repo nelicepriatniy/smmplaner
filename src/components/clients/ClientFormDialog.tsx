@@ -27,6 +27,8 @@ function stripAt(handle: string): string {
 
 export type ClientFormMode = "add" | "edit";
 
+type VkWallKind = "group" | "user";
+
 type FormState = {
   platform: ClientPlatform;
   fullName: string;
@@ -39,7 +41,22 @@ type FormState = {
   activitySpheres: string;
   telegramBotToken: string;
   telegramChatId: string;
+  vkWallKind: VkWallKind;
+  vkWallEntityId: string;
+  vkFromGroup: boolean;
+  vkAccessToken: string;
 };
+
+function vkInitialWallKind(client: ClientRecord): VkWallKind {
+  const id = client.vkOwnerId?.trim();
+  if (!id) return "group";
+  return id.startsWith("-") ? "group" : "user";
+}
+
+function vkInitialEntityId(client: ClientRecord): string {
+  const id = client.vkOwnerId?.trim().replace(/^-/, "") ?? "";
+  return id.replace(/\D/g, "");
+}
 
 function buildInitialState(mode: ClientFormMode, client: ClientRecord | null): FormState {
   if (mode === "edit" && client) {
@@ -55,6 +72,10 @@ function buildInitialState(mode: ClientFormMode, client: ClientRecord | null): F
       activitySpheres: client.activitySpheres.join(", "),
       telegramBotToken: "",
       telegramChatId: client.telegramChatId ?? "",
+      vkWallKind: vkInitialWallKind(client),
+      vkWallEntityId: vkInitialEntityId(client),
+      vkFromGroup: client.vkFromGroup ?? false,
+      vkAccessToken: "",
     };
   }
   return {
@@ -69,6 +90,10 @@ function buildInitialState(mode: ClientFormMode, client: ClientRecord | null): F
     activitySpheres: "",
     telegramBotToken: "",
     telegramChatId: "",
+    vkWallKind: "group",
+    vkWallEntityId: "",
+    vkFromGroup: true,
+    vkAccessToken: "",
   };
 }
 
@@ -119,6 +144,13 @@ function ClientFormBody({ mode, client, onDismiss, onSaved }: ClientFormBodyProp
         <>
           Посты для этого клиента планируются для отправки в указанный Telegram-чат через вашего
           бота (токен от @BotFather и ID чата сохраняются в базе).
+        </>
+      ) : values.platform === "vk" ? (
+        <>
+          Данные для вызова VK API (метод{" "}
+          <code className="rounded bg-[var(--surface-elevated)] px-1">wall.post</code>
+          ): access token, владелец стены (owner_id) и публикация от имени сообщества при
+          необходимости. Токен хранится в базе — доверенный сервер и ограничение прав токена.
         </>
       ) : (
         <>
@@ -177,10 +209,10 @@ function ClientFormBody({ mode, client, onDismiss, onSaved }: ClientFormBodyProp
             <span className="text-[14px] font-medium text-[var(--foreground)]">
               Платформа
             </span>
-            <div className="mt-2 flex gap-2">
+            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
               <button
                 type="button"
-                className={`flex-1 rounded-xl border px-3 py-2.5 text-[14px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
+                className={`rounded-xl border px-3 py-2.5 text-[14px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
                   values.platform === "instagram"
                     ? "border-[color-mix(in_srgb,var(--accent)_45%,var(--border))] bg-[var(--surface-elevated)] text-[var(--foreground)]"
                     : "border-[var(--border)] bg-[var(--background)] text-[var(--muted)] hover:text-[var(--foreground)]"
@@ -193,7 +225,7 @@ function ClientFormBody({ mode, client, onDismiss, onSaved }: ClientFormBodyProp
               </button>
               <button
                 type="button"
-                className={`flex-1 rounded-xl border px-3 py-2.5 text-[14px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
+                className={`rounded-xl border px-3 py-2.5 text-[14px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
                   values.platform === "telegram"
                     ? "border-[color-mix(in_srgb,var(--accent)_45%,var(--border))] bg-[var(--surface-elevated)] text-[var(--foreground)]"
                     : "border-[var(--border)] bg-[var(--background)] text-[var(--muted)] hover:text-[var(--foreground)]"
@@ -203,6 +235,19 @@ function ClientFormBody({ mode, client, onDismiss, onSaved }: ClientFormBodyProp
                 onClick={() => setField("platform", "telegram")}
               >
                 Telegram
+              </button>
+              <button
+                type="button"
+                className={`rounded-xl border px-3 py-2.5 text-[14px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
+                  values.platform === "vk"
+                    ? "border-[color-mix(in_srgb,var(--accent)_45%,var(--border))] bg-[var(--surface-elevated)] text-[var(--foreground)]"
+                    : "border-[var(--border)] bg-[var(--background)] text-[var(--muted)] hover:text-[var(--foreground)]"
+                }`}
+                aria-checked={values.platform === "vk"}
+                role="radio"
+                onClick={() => setField("platform", "vk")}
+              >
+                ВКонтакте
               </button>
             </div>
           </div>
@@ -352,7 +397,7 @@ function ClientFormBody({ mode, client, onDismiss, onSaved }: ClientFormBodyProp
                 </label>
               </div>
             </>
-          ) : (
+          ) : values.platform === "telegram" ? (
             <>
               <div>
                 <label
@@ -405,6 +450,136 @@ function ClientFormBody({ mode, client, onDismiss, onSaved }: ClientFormBodyProp
                 />
                 <p className="mt-1 text-[12px] text-[var(--muted)]">
                   Канал, группа или чат, куда будут уходить материалы этого клиента.
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <input type="hidden" name="vkWallKind" value={values.vkWallKind} />
+              <div role="radiogroup" aria-label="Куда публиковать в ВК">
+                <span className="text-[14px] font-medium text-[var(--foreground)]">
+                  Стена
+                </span>
+                <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    className={`rounded-xl border px-3 py-2.5 text-[14px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
+                      values.vkWallKind === "group"
+                        ? "border-[color-mix(in_srgb,var(--accent)_45%,var(--border))] bg-[var(--surface-elevated)] text-[var(--foreground)]"
+                        : "border-[var(--border)] bg-[var(--background)] text-[var(--muted)] hover:text-[var(--foreground)]"
+                    }`}
+                    aria-checked={values.vkWallKind === "group"}
+                    role="radio"
+                    onClick={() => {
+                      setField("vkWallKind", "group");
+                    }}
+                  >
+                    Сообщество (группа)
+                  </button>
+                  <button
+                    type="button"
+                    className={`rounded-xl border px-3 py-2.5 text-[14px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
+                      values.vkWallKind === "user"
+                        ? "border-[color-mix(in_srgb,var(--accent)_45%,var(--border))] bg-[var(--surface-elevated)] text-[var(--foreground)]"
+                        : "border-[var(--border)] bg-[var(--background)] text-[var(--muted)] hover:text-[var(--foreground)]"
+                    }`}
+                    aria-checked={values.vkWallKind === "user"}
+                    role="radio"
+                    onClick={() => {
+                      setField("vkWallKind", "user");
+                      setField("vkFromGroup", false);
+                    }}
+                  >
+                    Личная страница
+                  </button>
+                </div>
+                <p className="mt-1.5 text-[12px] text-[var(--muted)]">
+                  Для группы owner_id отрицательный (в форму — только цифры id из club… / public…).
+                  Для личной стены — числовой id пользователя (положительный owner_id).
+                </p>
+              </div>
+
+              <div>
+                <label
+                  htmlFor={`${formId}-vkentity`}
+                  className="text-[14px] font-medium text-[var(--foreground)]"
+                >
+                  {values.vkWallKind === "group"
+                    ? "ID сообщества (только цифры)"
+                    : "Числовой ID пользователя ВК"}
+                </label>
+                <input
+                  id={`${formId}-vkentity`}
+                  name="vkWallEntityId"
+                  className={`mt-2 ${inputClass} font-mono text-[14px]`}
+                  value={values.vkWallEntityId}
+                  onChange={(e) =>
+                    setField("vkWallEntityId", e.target.value.replace(/\D/g, ""))
+                  }
+                  required
+                  inputMode="numeric"
+                  autoComplete="off"
+                  placeholder={
+                    values.vkWallKind === "group"
+                      ? "например 123456789 из vk.com/club123456789"
+                      : "например 123456789 (vk.com/id…)"
+                  }
+                />
+              </div>
+
+              {values.vkWallKind === "group" ? (
+                <div className="flex gap-3 rounded-xl border border-[var(--border)] bg-[var(--background)] p-3.5">
+                  <input
+                    id={`${formId}-vkfrom`}
+                    type="checkbox"
+                    name="vkFromGroup"
+                    value="on"
+                    className="mt-0.5 size-4 shrink-0 cursor-pointer rounded border border-[var(--border)] bg-[var(--surface)] text-[var(--accent)]"
+                    checked={values.vkFromGroup}
+                    onChange={(e) => setField("vkFromGroup", e.target.checked)}
+                  />
+                  <label
+                    htmlFor={`${formId}-vkfrom`}
+                    className="cursor-pointer text-[13px] leading-snug text-[var(--foreground)]"
+                  >
+                    Публиковать от имени сообщества (параметр{" "}
+                    <code className="rounded bg-[var(--surface-elevated)] px-1">from_group=1</code>
+                    в API)
+                  </label>
+                </div>
+              ) : null}
+
+              <div>
+                <label
+                  htmlFor={`${formId}-vktoken`}
+                  className="text-[14px] font-medium text-[var(--foreground)]"
+                >
+                  Access token
+                </label>
+                <textarea
+                  id={`${formId}-vktoken`}
+                  name="vkAccessToken"
+                  className={`mt-2 min-h-[4.5rem] resize-y ${inputClass} font-mono text-[12px] leading-normal`}
+                  value={values.vkAccessToken}
+                  onChange={(e) => setField("vkAccessToken", e.target.value)}
+                  required={
+                    mode === "add" ||
+                    (mode === "edit" && client != null && !client.hasVkAccessToken)
+                  }
+                  autoComplete="off"
+                  rows={3}
+                  placeholder="Лучше пользовательский OAuth-токен (scope photos, wall)…"
+                />
+                <p className="mt-1 text-[12px] text-[var(--muted)]">
+                  Для постов с изображениями нужен пользовательский токен администратора группы (или
+                  страницы), а не ключ доступа сообщества: у ВК методы загрузки фото на стену с
+                  «групповым» токеном недоступны (ошибка 27). Секрет хранится в БД; при редактировании
+                  не подставляется.
+                  {mode === "edit" && client?.hasVkAccessToken ? (
+                    <span className="mt-1 block">
+                      Оставьте пустым, чтобы не менять токен; вставьте новый, чтобы заменить.
+                    </span>
+                  ) : null}
                 </p>
               </div>
             </>

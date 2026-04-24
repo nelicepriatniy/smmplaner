@@ -208,7 +208,11 @@ export function ContentCalendar({
                     post.publishTime
                   )}`;
                   const clientSlot =
-                    client?.platform === "telegram" ? `TG ${label}` : `@${label}`;
+                    client?.platform === "telegram"
+                      ? `TG ${label}`
+                      : client?.platform === "vk"
+                        ? `VK ${label}`
+                        : `@${label}`;
                   const title = showClientInSlot
                     ? `${timePart} · ${clientSlot}\n${captionLine}`
                     : `${timePart}\n${captionLine}`;
@@ -218,7 +222,7 @@ export function ContentCalendar({
                       <Link
                         href={`/posts/${post.id}/edit?returnTo=${encodeURIComponent(returnToForPostEdit)}`}
                         title={title}
-                        className="block rounded-md border border-solid bg-[var(--surface-elevated)] px-1 py-0.5 text-left text-[10px] leading-snug text-[var(--foreground)] transition-opacity hover:opacity-90 sm:px-1.5 sm:text-[11px]"
+                        className="block rounded-md border-2 border-solid bg-[var(--surface-elevated)] px-1 py-0.5 text-left text-[10px] leading-snug text-[var(--foreground)] transition-opacity hover:opacity-90 sm:px-1.5 sm:text-[11px]"
                         style={{ borderColor }}
                       >
                         <span className="font-semibold tabular-nums text-[var(--muted)]">
@@ -226,10 +230,10 @@ export function ContentCalendar({
                         </span>
                         {showClientInSlot ? (
                           <span className="text-[var(--foreground)]">
-                            {client?.platform === "telegram" ? (
-                              <> {label}</>
-                            ) : (
+                            {client?.platform === "instagram" ? (
                               <> @{label}</>
+                            ) : (
+                              <> {label}</>
                             )}
                           </span>
                         ) : null}
@@ -267,7 +271,7 @@ function LegendItem({
   return (
     <span className="inline-flex items-center gap-2">
       <span
-        className="size-2.5 shrink-0 rounded-sm border border-solid bg-[var(--surface-elevated)]"
+        className="size-3 shrink-0 rounded-sm border-2 border-solid bg-[var(--surface-elevated)]"
         style={{ borderColor: BORDER_BY_STATUS[statusKey] }}
         aria-hidden
       />

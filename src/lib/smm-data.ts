@@ -102,6 +102,9 @@ function enrichClientRecord(
     businessAccountConfirmed: c.businessAccountConfirmed,
     telegramChatId: c.telegramChatId ?? undefined,
     hasTelegramBotToken: Boolean(c.telegramBotToken?.trim()),
+    vkOwnerId: c.vkOwnerId ?? undefined,
+    vkFromGroup: c.vkFromGroup,
+    hasVkAccessToken: Boolean(c.vkAccessToken?.trim()),
   };
 }
 
@@ -211,6 +214,9 @@ export async function getClientRecordById(
     activitySpheres: spheresTuple(row.activitySpheres),
     telegramChatId: row.telegramChatId ?? undefined,
     hasTelegramBotToken: Boolean(row.telegramBotToken?.trim()),
+    vkOwnerId: row.vkOwnerId ?? undefined,
+    vkFromGroup: row.vkFromGroup,
+    hasVkAccessToken: Boolean(row.vkAccessToken?.trim()),
   };
 }
 

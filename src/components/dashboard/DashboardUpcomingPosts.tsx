@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { isPublicUploadImageSrc } from "@/lib/media-display";
 import Link from "next/link";
 import { clientSelectLabel, type ClientRecord, type PostDraftRecord } from "@/domain/smm";
 import { POST_TYPE_OPTIONS } from "@/types/postType";
@@ -77,6 +78,7 @@ export function DashboardUpcomingPosts({
                         fill
                         className="object-cover"
                         sizes="72px"
+                        unoptimized={isPublicUploadImageSrc(thumb)}
                       />
                     ) : null}
                   </div>

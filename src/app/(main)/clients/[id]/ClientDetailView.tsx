@@ -120,7 +120,11 @@ export function ClientDetailView({
               </div>
               <div>
                 <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--muted)]">
-                  {client.platform === "telegram" ? "Telegram" : "Instagram"}
+                  {client.platform === "telegram"
+                    ? "Telegram"
+                    : client.platform === "vk"
+                      ? "ВКонтакте"
+                      : "Instagram"}
                 </dt>
                 <dd className="mt-0.5">
                   {client.platform === "telegram" ? (
@@ -141,6 +145,35 @@ export function ClientDetailView({
                         </p>
                         <p className="mt-0.5 break-all font-mono text-[13px]">
                           {client.telegramChatId ?? "—"}
+                        </p>
+                      </div>
+                    </div>
+                  ) : client.platform === "vk" ? (
+                    <div className="space-y-3 text-[14px] text-[var(--foreground)]">
+                      <div>
+                        <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--muted)]">
+                          Access token
+                        </p>
+                        <p className="mt-0.5 text-[13px] text-[var(--foreground)]">
+                          {client.hasVkAccessToken
+                            ? "Сохранён (не показывается)"
+                            : "Не задан"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--muted)]">
+                          owner_id (стена)
+                        </p>
+                        <p className="mt-0.5 break-all font-mono text-[13px]">
+                          {client.vkOwnerId ?? "—"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--muted)]">
+                          От имени сообщества
+                        </p>
+                        <p className="mt-0.5 text-[13px]">
+                          {client.vkFromGroup ? "Да (from_group)" : "Нет"}
                         </p>
                       </div>
                     </div>

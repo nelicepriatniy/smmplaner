@@ -1,8 +1,25 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogoMark } from "@/components/header/LogoMark";
+
+const ThemeToggle = dynamic(
+  () =>
+    import("@/components/theme/ThemeToggle").then((m) => ({
+      default: m.ThemeToggle,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="mb-4 px-1" aria-hidden>
+        <div className="mb-2 h-3 w-14 rounded bg-[var(--surface-elevated)]" />
+        <div className="h-9 rounded-lg bg-[var(--surface-elevated)] ring-1 ring-[var(--border)]" />
+      </div>
+    ),
+  },
+);
 
 const mainNav = [
   { href: "/", label: "Дашборд" },
@@ -108,6 +125,7 @@ export function AppSidebar({ user }: { user: AppSidebarUser }) {
       </nav>
 
       <div className="mt-auto border-t border-[var(--border)] pt-5">
+        <ThemeToggle />
         <Link
           href="/account"
           className={`flex items-center gap-3 rounded-xl px-2 py-2 outline-offset-2 transition-colors focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${

@@ -20,9 +20,14 @@ export function TelegramPostPreview({
   const [slide, setSlide] = useState(0);
   const n = imageUrls.length;
   const title = client?.fullName?.trim() || "Канал";
-  const subtitle = client?.telegramChatId?.trim()
-    ? `чат ${client.telegramChatId.trim()}`
-    : "Telegram";
+  const subtitle =
+    client?.platform === "vk"
+      ? client.vkOwnerId?.trim()
+        ? `стена ${client.vkOwnerId.trim()}`
+        : "ВКонтакте"
+      : client?.telegramChatId?.trim()
+        ? `чат ${client.telegramChatId.trim()}`
+        : "Telegram";
 
   const key = useMemo(() => imageUrls.join("\0"), [imageUrls]);
   useEffect(() => {

@@ -39,6 +39,7 @@ enum ActivityKind {
 enum ClientPlatform {
   instagram
   telegram
+  vk
 }
 
 model User {
@@ -72,6 +73,12 @@ model Client {
   telegramBotToken   String?  @map("telegram_bot_token") @db.Text
   /// ID чата/канала, куда отправлять посты.
   telegramChatId     String?  @map("telegram_chat_id") @db.Text
+  /// Токен пользователя или сообщества ВК для вызова API (секрет).
+  vkAccessToken      String?  @map("vk_access_token") @db.Text
+  /// owner_id для wall.post: отрицательный — стена сообщества, положительный — пользователя.
+  vkOwnerId          String?  @map("vk_owner_id") @db.Text
+  /// Публиковать от имени сообщества (параметр from_group в wall.post).
+  vkFromGroup        Boolean  @default(false) @map("vk_from_group")
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 

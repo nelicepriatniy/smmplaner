@@ -24,6 +24,7 @@ import {
 } from "@/types/postType";
 import { InstagramPostPreview } from "./InstagramPostPreview";
 import { TelegramPostPreview } from "./TelegramPostPreview";
+import { useAppNotifications } from "@/components/notifications/AppNotifications";
 import {
   getDefaultPublishSchedule,
   getMinTimeForDateField,
@@ -84,8 +85,10 @@ function initChannelAndClient(
   }
   const ig = clientsForPlatform(clients, "instagram");
   const tg = clientsForPlatform(clients, "telegram");
+  const vk = clientsForPlatform(clients, "vk");
   if (ig.length) return { publishPlatform: "instagram", clientId: ig[0]!.id };
   if (tg.length) return { publishPlatform: "telegram", clientId: tg[0]!.id };
+  if (vk.length) return { publishPlatform: "vk", clientId: vk[0]!.id };
   return { publishPlatform: clients[0]!.platform, clientId: clients[0]!.id };
 }
 
@@ -107,6 +110,7 @@ export function NewPostEditor({
   duplicateFrom = null,
 }: NewPostEditorProps) {
   const router = useRouter();
+  const { toast, confirm } = useAppNotifications();
   const [isSaving, startSaveTransition] = useTransition();
   const [isDeleting, startDeleteTransition] = useTransition();
   const [isPublishing, startPublishTransition] = useTransition();
@@ -196,6 +200,10 @@ export function NewPostEditor({
     () => clients.some((c) => c.platform === "telegram"),
     [clients]
   );
+  const hasVkClients = useMemo(
+    () => clients.some((c) => c.platform === "vk"),
+    [clients]
+  );
 
   const onPublishPlatform = useCallback(
     (p: ClientPlatform) => {
@@ -203,7 +211,7 @@ export function NewPostEditor({
       setPublishPlatform(p);
       const pool = clientsForPlatform(clients, p);
       setClientId((prev) => (pool.some((c) => c.id === prev) ? prev : pool[0]?.id ?? ""));
-      if (p === "telegram") {
+      if (p === "telegram" || p === "vk") {
         setPostType("feed");
         setLocation("");
         setFirstComment("");
@@ -268,14 +276,15 @@ export function NewPostEditor({
   }, [imageUrls]);
 
   const buildPayload = useCallback(() => {
-    const isTg = publishPlatform === "telegram";
+    const isTgOrVk =
+      publishPlatform === "telegram" || publishPlatform === "vk";
     return {
       clientId,
-      postType: isTg ? ("feed" as PostType) : postType,
+      postType: isTgOrVk ? ("feed" as PostType) : postType,
       caption,
-      location: isTg ? "" : location,
-      firstComment: isTg ? "" : firstComment,
-      altText: isTg ? "" : altText,
+      location: isTgOrVk ? "" : location,
+      firstComment: isTgOrVk ? "" : firstComment,
+      altText: isTgOrVk ? "" : altText,
       imageUrls,
       publishDate: publishSchedule.date,
       publishTime: publishSchedule.time,
@@ -365,42 +374,64 @@ export function NewPostEditor({
 
   const removePost = useCallback(() => {
     if (!existingPostId) return;
-    if (!window.confirm("Удалить этот пост? Действие необратимо.")) return;
-    setSaveError("");
-    startDeleteTransition(async () => {
-      const res = await deletePostAction(existingPostId);
-      if (!res.ok) {
-        setSaveError(res.error);
-        return;
-      }
-      router.push("/posts/current");
-      router.refresh();
-    });
-  }, [existingPostId, router, startDeleteTransition]);
+    void (async () => {
+      const ok = await confirm({
+        message: "Удалить этот пост? Действие необратимо.",
+        confirmLabel: "Удалить",
+        danger: true,
+      });
+      if (!ok) return;
+      setSaveError("");
+      startDeleteTransition(async () => {
+        const res = await deletePostAction(existingPostId);
+        if (!res.ok) {
+          setSaveError(res.error);
+          return;
+        }
+        toast({ message: "Пост удалён", variant: "success" });
+        router.push("/posts/current");
+        router.refresh();
+      });
+    })();
+  }, [confirm, existingPostId, router, startDeleteTransition, toast]);
 
   const publishNow = useCallback(() => {
     if (!existingPostId) return;
-    if (
-      !window.confirm(
-        "Отправить пост в Telegram сейчас? В базе он будет отмечен как опубликованный."
-      )
-    ) {
-      return;
-    }
-    setSaveError("");
-    startPublishTransition(async () => {
-      const res = await publishPostNowAction(existingPostId, buildPayload());
-      if (!res.ok) {
-        setSaveError(res.error);
-        return;
-      }
-      router.refresh();
-    });
-  }, [buildPayload, existingPostId, router, startPublishTransition]);
+    void (async () => {
+      const isTg = client?.platform === "telegram";
+      const isVk = client?.platform === "vk";
+      const ok = await confirm({
+        message: isVk
+          ? "Опубликовать запись на стене ВКонтакте сейчас? В базе пост будет отмечен как опубликованный."
+          : isTg
+            ? "Отправить пост в Telegram сейчас? В базе он будет отмечен как опубликованный."
+            : "Опубликовать сейчас? В базе пост будет отмечен как опубликованный.",
+        confirmLabel: "Опубликовать",
+      });
+      if (!ok) return;
+      setSaveError("");
+      startPublishTransition(async () => {
+        const res = await publishPostNowAction(existingPostId, buildPayload());
+        if (!res.ok) {
+          setSaveError(res.error);
+          return;
+        }
+        toast({
+          message: isVk
+            ? "Запись опубликована во ВКонтакте"
+            : isTg
+              ? "Пост отправлен в Telegram"
+              : "Готово",
+          variant: "success",
+        });
+        router.refresh();
+      });
+    })();
+  }, [buildPayload, client?.platform, confirm, existingPostId, router, startPublishTransition, toast]);
 
-  const canPublishNowTg =
+  const canPublishNowInstant =
     isEditMode &&
-    client?.platform === "telegram" &&
+    (client?.platform === "telegram" || client?.platform === "vk") &&
     existingPostStatus !== "published" &&
     existingPostStatus !== "rejected";
 
@@ -427,11 +458,11 @@ export function NewPostEditor({
             <span className="text-[14px] font-medium text-[var(--foreground)]">
               Платформа
             </span>
-            <div className="mt-2 flex gap-2">
+            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
               <button
                 type="button"
                 disabled={isEditMode || !hasIgClients}
-                className={`flex-1 rounded-xl border px-3 py-2.5 text-[14px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-40 ${
+                className={`rounded-xl border px-3 py-2.5 text-[14px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-40 ${
                   publishPlatform === "instagram"
                     ? "border-[color-mix(in_srgb,var(--accent)_45%,var(--border))] bg-[var(--surface-elevated)] text-[var(--foreground)]"
                     : "border-[var(--border)] bg-[var(--background)] text-[var(--muted)] hover:text-[var(--foreground)]"
@@ -445,7 +476,7 @@ export function NewPostEditor({
               <button
                 type="button"
                 disabled={isEditMode || !hasTgClients}
-                className={`flex-1 rounded-xl border px-3 py-2.5 text-[14px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-40 ${
+                className={`rounded-xl border px-3 py-2.5 text-[14px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-40 ${
                   publishPlatform === "telegram"
                     ? "border-[color-mix(in_srgb,var(--accent)_45%,var(--border))] bg-[var(--surface-elevated)] text-[var(--foreground)]"
                     : "border-[var(--border)] bg-[var(--background)] text-[var(--muted)] hover:text-[var(--foreground)]"
@@ -456,14 +487,32 @@ export function NewPostEditor({
               >
                 Telegram
               </button>
+              <button
+                type="button"
+                disabled={isEditMode || !hasVkClients}
+                className={`rounded-xl border px-3 py-2.5 text-[14px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-40 ${
+                  publishPlatform === "vk"
+                    ? "border-[color-mix(in_srgb,var(--accent)_45%,var(--border))] bg-[var(--surface-elevated)] text-[var(--foreground)]"
+                    : "border-[var(--border)] bg-[var(--background)] text-[var(--muted)] hover:text-[var(--foreground)]"
+                }`}
+                aria-checked={publishPlatform === "vk"}
+                role="radio"
+                onClick={() => onPublishPlatform("vk")}
+              >
+                ВКонтакте
+              </button>
             </div>
-            {!hasIgClients || !hasTgClients ? (
+            {!(hasIgClients && hasTgClients && hasVkClients) ? (
               <p className="mt-2 text-[12px] text-[var(--muted)]">
-                {!hasIgClients && !hasTgClients
+                {!hasIgClients && !hasTgClients && !hasVkClients
                   ? "Добавьте клиента в разделе «Клиенты»."
-                  : !hasIgClients
-                    ? "Клиентов Instagram нет — доступен только Telegram."
-                    : "Клиентов Telegram нет — доступен только Instagram."}
+                  : `Нет клиентов для: ${[
+                      !hasIgClients ? "Instagram" : null,
+                      !hasTgClients ? "Telegram" : null,
+                      !hasVkClients ? "ВКонтакте" : null,
+                    ]
+                      .filter(Boolean)
+                      .join(", ")} — добавьте в «Клиенты» или выберите доступную платформу.`}
               </p>
             ) : null}
             {isEditMode ? (
@@ -533,8 +582,10 @@ export function NewPostEditor({
               Медиа
             </span>
             <p className="mt-1 text-[13px] text-[var(--muted)]">
-              {publishPlatform === "telegram"
-                ? "Одно или несколько изображений (альбом в канале). Подпись — отдельным блоком под медиа."
+              {publishPlatform === "telegram" || publishPlatform === "vk"
+                ? publishPlatform === "vk"
+                  ? "Одно или несколько изображений (как вложения к записи на стене). Подпись — текст записи."
+                  : "Одно или несколько изображений (альбом в канале). Подпись — отдельным блоком под медиа."
                 : postType === "reels" || postType === "stories"
                   ? "Обложка или кадр (9:16). Можно несколько кадров подряд в сторис/коллаж."
                   : "Одно или несколько изображений (карусель). Для «Фото» превью 1:1."}
@@ -676,7 +727,7 @@ export function NewPostEditor({
               >
                 {isSaving ? "Сохранение…" : "Сохранить"}
               </button>
-              {canPublishNowTg ? (
+              {canPublishNowInstant ? (
                 <button
                   type="button"
                   onClick={publishNow}
@@ -742,7 +793,9 @@ export function NewPostEditor({
         aria-label={
           publishPlatform === "telegram"
             ? "Предпросмотр в стиле Telegram"
-            : "Предпросмотр в стиле Instagram"
+            : publishPlatform === "vk"
+              ? "Предпросмотр записи на стене (упрощённо)"
+              : "Предпросмотр в стиле Instagram"
         }
       >
         <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
@@ -751,7 +804,9 @@ export function NewPostEditor({
         <p className="mt-1.5 text-[13px] text-[var(--muted)]">
           {publishPlatform === "telegram"
             ? "Канал / чат: шапка, медиа и подпись, как в типичном посте Telegram."
-            : postType === "feed" && "Лента, светлая тема, карточка 4:5."}
+            : publishPlatform === "vk"
+              ? "Упрощённый вид: шапка с названием клиента и owner_id, медиа и текст (как у записи на стене)."
+              : postType === "feed" && "Лента, светлая тема, карточка 4:5."}
           {publishPlatform === "instagram" && postType === "photo" &&
             "Тот же вид ленты, квадратный кадр 1:1."}
           {publishPlatform === "instagram" && postType === "reels" &&
@@ -763,7 +818,7 @@ export function NewPostEditor({
           className="mt-5 flex w-full min-w-0 max-w-full justify-center rounded-2xl border border-[#efefef] p-4"
           style={{ background: "#fafafa" }}
         >
-          {publishPlatform === "telegram" ? (
+          {publishPlatform === "telegram" || publishPlatform === "vk" ? (
             <TelegramPostPreview
               client={client}
               imageUrls={imageUrls}
@@ -792,7 +847,9 @@ export function NewPostEditor({
           <p className="text-[13px] text-[var(--muted)]">
             {publishPlatform === "telegram"
               ? "Когда отправить материалы в Telegram или поставить напоминание"
-              : "Когда выкладывать в ленту или поставить напоминание"}
+              : publishPlatform === "vk"
+                ? "Когда опубликовать во ВКонтакте или поставить напоминание"
+                : "Когда выкладывать в ленту или поставить напоминание"}
           </p>
           <div className="mt-3 flex flex-row items-stretch gap-3">
             <div className="min-w-0 flex-1">
