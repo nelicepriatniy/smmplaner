@@ -1,13 +1,35 @@
 import type { Metadata } from "next";
-import { ContentCalendar } from "@/components/calendar/ContentCalendar";
+import { Suspense } from "react";
 import { mockClients, mockPostDrafts } from "@/data/mockDb";
+import { CalendarWithClientFilter } from "./CalendarWithClientFilter";
 
 export const metadata: Metadata = {
   title: "Календарь — smmplaner",
   description: "Планирование публикаций по датам",
 };
 
-export default function CalendarPage() {
+type PageProps = {
+  searchParams: Promise<{ client?: string }>;
+};
+
+export default async function CalendarPage({ searchParams }: PageProps) {
+  const { client: clientParam } = await searchParams;
+
+  const filterClientId =
+    typeof clientParam === "string" &&
+    mockClients.some((c) => c.id === clientParam)
+      ? clientParam
+      : undefined;
+
+  const displayPosts = mockPostDrafts.filter((p) =>
+    filterClientId ? p.clientId === filterClientId : true
+  );
+
+  const filterOptions = mockClients.map((c) => ({
+    id: c.id,
+    label: `${c.fullName} (@${c.instagramUsername})`,
+  }));
+
   return (
     <main className="w-full py-8 sm:py-10">
       <header className="mb-8">
@@ -19,7 +41,19 @@ export default function CalendarPage() {
         </p>
       </header>
 
-      <ContentCalendar posts={mockPostDrafts} clients={mockClients} />
+      <Suspense
+        fallback={
+          <div className="min-h-48 text-[14px] text-[var(--muted)]">
+            Загрузка календаря…
+          </div>
+        }
+      >
+        <CalendarWithClientFilter
+          posts={displayPosts}
+          clients={mockClients}
+          filterOptions={filterOptions}
+        />
+      </Suspense>
     </main>
   );
 }

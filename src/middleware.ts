@@ -1,36 +1,30 @@
+import { auth } from "@/auth";
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import {
-  PANEL_SESSION_COOKIE,
-  verifyPanelSessionValue,
-} from "@/lib/panelSession";
 
-export async function middleware(request: NextRequest) {
-  const token = request.cookies.get(PANEL_SESSION_COOKIE)?.value;
-  const session = await verifyPanelSessionValue(token);
-
+export default auth((request) => {
   const { pathname } = request.nextUrl;
-  const isLoginPage = pathname === "/login";
-  const isLoginApi =
-    pathname === "/api/auth/login" && request.method === "POST";
+  const loggedIn = !!request.auth;
 
-  if (session) {
-    if (isLoginPage) {
-      return NextResponse.redirect(new URL("/", request.url));
+  if (pathname.startsWith("/api/auth")) {
+    return NextResponse.next();
+  }
+
+  if (loggedIn && (pathname === "/login" || pathname === "/register")) {
+    return NextResponse.redirect(new URL("/", request.url));
+  }
+
+  if (!loggedIn) {
+    if (pathname === "/login" || pathname === "/register") {
+      return NextResponse.next();
     }
-    return NextResponse.next();
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  if (isLoginPage || isLoginApi) {
-    return NextResponse.next();
-  }
-
-  if (pathname.startsWith("/api/")) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  return NextResponse.redirect(new URL("/login", request.url));
-}
+  return NextResponse.next();
+});
 
 export const config = {
   matcher: [

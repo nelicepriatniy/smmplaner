@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { Suspense, useCallback, useState } from "react";
 import Link from "next/link";
 import { ContentCalendar } from "@/components/calendar/ContentCalendar";
 import { ClientFormDialog } from "@/components/clients/ClientFormDialog";
@@ -60,90 +60,7 @@ export function ClientDetailView({ client, clientPosts }: ClientDetailViewProps)
             {client.fullName}
           </h1>
 
-          <dl className="mt-8 min-h-0 flex-1 space-y-0 divide-y divide-[var(--border)] sm:mt-10">
-            <div className="grid gap-1 py-4 first:pt-0 sm:grid-cols-[min(14rem,32%)_1fr] sm:gap-6 sm:py-5">
-              <dt className="text-[12px] font-medium uppercase tracking-[0.08em] text-[var(--muted)]">
-                ID в системе
-              </dt>
-              <dd className="font-mono text-[16px] text-[var(--foreground)]">
-                {client.id}
-              </dd>
-            </div>
-
-            <div className="grid gap-1 py-4 first:pt-0 sm:grid-cols-[min(14rem,32%)_1fr] sm:gap-6 sm:py-5">
-              <dt className="text-[12px] font-medium uppercase tracking-[0.08em] text-[var(--muted)]">
-                Логин Instagram
-              </dt>
-              <dd>
-                <a
-                  href={igUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[16px] text-[var(--accent)] underline-offset-2 hover:underline"
-                >
-                  @{ig}
-                </a>
-              </dd>
-            </div>
-
-            <div className="grid gap-1 py-4 first:pt-0 sm:grid-cols-[min(14rem,32%)_1fr] sm:gap-6 sm:py-5">
-              <dt className="text-[12px] font-medium uppercase tracking-[0.08em] text-[var(--muted)]">
-                Всего опубликовано / запланировано
-              </dt>
-              <dd className="text-[16px] font-semibold tabular-nums text-[var(--foreground)]">
-                {client.postsTotal}
-              </dd>
-            </div>
-
-            <div className="grid gap-1 py-4 first:pt-0 sm:grid-cols-[min(14rem,32%)_1fr] sm:gap-6 sm:py-5">
-              <dt className="text-[12px] font-medium uppercase tracking-[0.08em] text-[var(--muted)]">
-                Постов в текущем календарном месяце
-              </dt>
-              <dd className="text-[16px] font-semibold tabular-nums text-[var(--foreground)]">
-                {client.postsThisMonth}
-              </dd>
-            </div>
-
-            <div className="grid gap-1 py-4 first:pt-0 sm:grid-cols-[min(14rem,32%)_1fr] sm:gap-6 sm:py-5">
-              <dt className="text-[12px] font-medium uppercase tracking-[0.08em] text-[var(--muted)]">
-                На модерации / согласовании
-              </dt>
-              <dd
-                className={`text-[16px] font-semibold tabular-nums ${
-                  client.postsPendingReview > 0
-                    ? "text-[var(--accent)]"
-                    : "text-[var(--foreground)]"
-                }`}
-              >
-                {client.postsPendingReview}
-              </dd>
-            </div>
-
-            <div className="grid gap-1 py-4 first:pt-0 sm:py-5 sm:grid-cols-[min(14rem,32%)_1fr] sm:gap-6">
-              <dt className="text-[12px] font-medium uppercase tracking-[0.08em] text-[var(--muted)]">
-                Сферы деятельности
-              </dt>
-              <dd>
-                <ul
-                  className="flex flex-wrap gap-2"
-                  aria-label="Сферы деятельности"
-                >
-                  {client.activitySpheres.map((sphere) => (
-                    <li
-                      key={sphere}
-                      className="rounded-md bg-[var(--surface-elevated)] px-2.5 py-1.5 text-[14px] text-[var(--foreground)]"
-                    >
-                      {sphere}
-                    </li>
-                  ))}
-                </ul>
-              </dd>
-            </div>
-          </dl>
-
-          <div
-            className="mt-10 w-full min-w-0 max-w-full border-t border-[var(--border)] pt-8"
-          >
+          <div className="mt-5 w-full min-w-0 max-w-full sm:mt-6">
             <div className="flex flex-col gap-3 min-[32rem]:flex-row min-[32rem]:items-center min-[32rem]:justify-between">
               <h2 className="text-[17px] font-semibold tracking-tight text-[var(--foreground)]">
                 Календарь
@@ -159,8 +76,97 @@ export function ClientDetailView({ client, clientPosts }: ClientDetailViewProps)
               Слоты по датам: только посты этого клиента (как в разделе «Календарь»).
             </p>
             <div className="mt-6 w-full min-w-0 min-h-0">
-              <ContentCalendar posts={clientPosts} clients={mockClients} />
+              <Suspense
+                fallback={
+                  <div className="min-h-48 text-[14px] text-[var(--muted)]">
+                    Загрузка календаря…
+                  </div>
+                }
+              >
+                <ContentCalendar posts={clientPosts} clients={mockClients} />
+              </Suspense>
             </div>
+          </div>
+
+          <div className="mt-6 w-full min-w-0 border-t border-[var(--border)] pt-5 sm:mt-7 sm:pt-6">
+            <h2 className="text-[15px] font-semibold tracking-tight text-[var(--foreground)]">
+              Сведения о клиенте
+            </h2>
+            <dl className="mt-3 grid min-h-0 max-w-4xl grid-cols-1 gap-x-6 gap-y-2.5 sm:grid-cols-2 sm:gap-y-2.5">
+              <div>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--muted)]">
+                  ID
+                </dt>
+                <dd className="mt-0.5 break-all font-mono text-[14px] text-[var(--foreground)]">
+                  {client.id}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--muted)]">
+                  Instagram
+                </dt>
+                <dd className="mt-0.5">
+                  <a
+                    href={igUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[14px] text-[var(--accent)] underline-offset-2 hover:underline"
+                  >
+                    @{ig}
+                  </a>
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--muted)]">
+                  Опубликовано / запланировано
+                </dt>
+                <dd className="mt-0.5 text-[14px] font-semibold tabular-nums text-[var(--foreground)]">
+                  {client.postsTotal}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--muted)]">
+                  Посты в текущем месяце
+                </dt>
+                <dd className="mt-0.5 text-[14px] font-semibold tabular-nums text-[var(--foreground)]">
+                  {client.postsThisMonth}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--muted)]">
+                  Модерация
+                </dt>
+                <dd
+                  className={`mt-0.5 text-[14px] font-semibold tabular-nums ${
+                    client.postsPendingReview > 0
+                      ? "text-[var(--accent)]"
+                      : "text-[var(--foreground)]"
+                  }`}
+                >
+                  {client.postsPendingReview}
+                </dd>
+              </div>
+              <div className="sm:col-span-2">
+                <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--muted)]">
+                  Сферы
+                </dt>
+                <dd className="mt-1.5">
+                  <ul
+                    className="flex flex-wrap gap-1.5"
+                    aria-label="Сферы деятельности"
+                  >
+                    {client.activitySpheres.map((sphere) => (
+                      <li
+                        key={sphere}
+                        className="rounded bg-[var(--surface-elevated)] px-2 py-0.5 text-[12px] text-[var(--foreground)]"
+                      >
+                        {sphere}
+                      </li>
+                    ))}
+                  </ul>
+                </dd>
+              </div>
+            </dl>
           </div>
         </div>
       </section>

@@ -1,19 +1,14 @@
-import { cookies } from "next/headers";
+import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { AppSidebar } from "@/components/sidebar/AppSidebar";
-import {
-  PANEL_SESSION_COOKIE,
-  verifyPanelSessionValue,
-} from "@/lib/panelSession";
 
 export default async function MainAppLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const token = (await cookies()).get(PANEL_SESSION_COOKIE)?.value;
-  const session = await verifyPanelSessionValue(token);
-  if (!session) {
+  const session = await auth();
+  if (!session?.user) {
     redirect("/login");
   }
 

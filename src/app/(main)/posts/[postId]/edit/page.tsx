@@ -3,9 +3,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { NewPostEditor } from "@/components/posts/NewPostEditor";
 import { getMockPostDraftById, postDraftToEditorInitial } from "@/data/mockDb";
+import { safeCalendarReturnTo } from "@/lib/safeReturnTo";
 
 type PageProps = {
   params: Promise<{ postId: string }>;
+  searchParams: Promise<{ returnTo?: string | string[] }>;
 };
 
 export async function generateMetadata({
@@ -19,8 +21,10 @@ export async function generateMetadata({
   };
 }
 
-export default async function EditPostPage({ params }: PageProps) {
+export default async function EditPostPage({ params, searchParams }: PageProps) {
   const { postId } = await params;
+  const { returnTo: returnToParam } = await searchParams;
+  const backHref = safeCalendarReturnTo(returnToParam);
   const draft = getMockPostDraftById(postId);
   if (!draft) notFound();
 
@@ -28,6 +32,16 @@ export default async function EditPostPage({ params }: PageProps) {
 
   return (
     <main className="w-full py-8 sm:py-10">
+      {backHref ? (
+        <p className="mb-4 -mt-1 min-w-0 sm:-mt-2">
+          <Link
+            href={backHref}
+            className="text-[14px] font-medium text-[var(--accent)] underline-offset-2 hover:underline"
+          >
+            ← Назад
+          </Link>
+        </p>
+      ) : null}
       <header className="mb-2">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
           <h1 className="text-[22px] font-semibold tracking-tight text-[var(--foreground)] sm:text-[24px]">

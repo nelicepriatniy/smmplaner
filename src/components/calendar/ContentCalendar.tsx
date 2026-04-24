@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useLayoutEffect, useMemo, useState } from "react";
 import {
   POST_DRAFT_STATUS_LABELS,
   type ClientRecord,
@@ -47,6 +48,23 @@ function groupPostsByYmd(posts: PostDraftRecord[]) {
   return map;
 }
 
+function parseYmdFromSearch(sp: { get: (k: string) => string | null } | null) {
+  if (!sp) return { year: INITIAL_YEAR, monthIndex: INITIAL_MONTH_INDEX };
+  const yq = sp.get("y");
+  const mq = sp.get("m");
+  let year = INITIAL_YEAR;
+  let monthIndex = INITIAL_MONTH_INDEX;
+  if (yq != null) {
+    const n = Number.parseInt(yq, 10);
+    if (Number.isFinite(n) && n >= 2000 && n < 2100) year = n;
+  }
+  if (mq != null) {
+    const n = Number.parseInt(mq, 10);
+    if (Number.isFinite(n) && n >= 0 && n <= 11) monthIndex = n;
+  }
+  return { year, monthIndex };
+}
+
 export function ContentCalendar({
   posts,
   clients,
@@ -54,8 +72,19 @@ export function ContentCalendar({
   posts: PostDraftRecord[];
   clients: ClientRecord[];
 }) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [year, setYear] = useState(INITIAL_YEAR);
   const [monthIndex, setMonthIndex] = useState(INITIAL_MONTH_INDEX);
+
+  useLayoutEffect(() => {
+    const yq = searchParams.get("y");
+    const mq = searchParams.get("m");
+    if (yq == null && mq == null) return;
+    const { year: y, monthIndex: m } = parseYmdFromSearch(searchParams);
+    setYear(y);
+    setMonthIndex(m);
+  }, [searchParams]);
 
   const clientById = useMemo(
     () => Object.fromEntries(clients.map((c) => [c.id, c])),
@@ -79,6 +108,14 @@ export function ContentCalendar({
       ),
     [year, monthIndex]
   );
+
+  const returnToForPostEdit = useMemo(() => {
+    const next = new URLSearchParams(searchParams.toString());
+    next.set("y", String(year));
+    next.set("m", String(monthIndex));
+    const q = next.toString();
+    return q ? `${pathname}?${q}` : pathname;
+  }, [pathname, searchParams, year, monthIndex]);
 
   const todayYmd = useMemo(() => toLocalYmd(new Date()), []);
 
@@ -165,7 +202,7 @@ export function ContentCalendar({
                   return (
                     <li key={post.id}>
                       <Link
-                        href={`/posts/${post.id}/edit`}
+                        href={`/posts/${post.id}/edit?returnTo=${encodeURIComponent(returnToForPostEdit)}`}
                         title={title}
                         className="block rounded-md border border-solid bg-[var(--surface-elevated)] px-1 py-0.5 text-left text-[10px] leading-snug text-[var(--foreground)] transition-opacity hover:opacity-90 sm:px-1.5 sm:text-[11px]"
                         style={{ borderColor }}
