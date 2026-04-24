@@ -4,6 +4,65 @@ import { useEffect, useRef, useState } from "react";
 
 const DEFAULT_SCOPE = "wall,photos,offline";
 
+/** Как в @vkid/sdk `getCookie` — читаем PKCE после LOGIN_SUCCESS. */
+function readVkidSdkCookie(name: string): string | undefined {
+  try {
+    const re = new RegExp(
+      "(?:^|; )" +
+        ("vkid_sdk:" + name).replace(/([.$?*|{}()\[\]\\\/+^])/g, "\\$1") +
+        "=([^;]*)"
+    );
+    const m = document.cookie.match(re);
+    return m?.[1] ? decodeURIComponent(m[1]) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Сброс PKCE-cookies после успешного обмена (аналог SDK `clear*Cookie`). */
+function clearVkidSdkCookie(name: string) {
+  try {
+    const allowedDomain = location.host.split(".").slice(-2).join(".");
+    document.cookie = [
+      `vkid_sdk:${name}=`,
+      "expires=Thu, 01 Jan 1970 00:00:00 UTC",
+      "path=/",
+      "SameSite=Strict",
+      "Secure",
+      `domain=.${allowedDomain}`,
+    ].join("; ");
+  } catch {
+    /* ignore */
+  }
+}
+
+async function exchangeCodeViaApi(body: {
+  code: string;
+  device_id: string;
+  code_verifier: string;
+  state: string;
+}): Promise<{ access_token: string }> {
+  const res = await fetch("/api/vk/oauth-exchange", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    credentials: "same-origin",
+  });
+  let data: { access_token?: string; error?: string };
+  try {
+    data = (await res.json()) as { access_token?: string; error?: string };
+  } catch {
+    throw new Error(`Сервер вернул не JSON (HTTP ${res.status}).`);
+  }
+  if (!res.ok) {
+    throw new Error(data.error ?? `HTTP ${res.status}`);
+  }
+  if (!data.access_token) {
+    throw new Error("В ответе сервера нет access_token.");
+  }
+  return { access_token: data.access_token };
+}
+
 type VkIdTokenButtonProps = {
   /** Подставить access token в форму клиента ВК. */
   onAccessToken: (accessToken: string) => void;
@@ -24,6 +83,13 @@ export function VkIdTokenButton({ onAccessToken, disabled }: VkIdTokenButtonProp
   const [localError, setLocalError] = useState<string | null>(null);
   const [tokenOk, setTokenOk] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [httpWarn, setHttpWarn] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.protocol === "http:") {
+      setHttpWarn(true);
+    }
+  }, []);
 
   useEffect(() => {
     setHint(null);
@@ -58,6 +124,12 @@ export function VkIdTokenButton({ onAccessToken, disabled }: VkIdTokenButtonProp
           if (cancelled || !containerRef.current) return false;
 
           const scope = process.env.NEXT_PUBLIC_VK_SCOPE?.trim() || DEFAULT_SCOPE;
+          const host =
+            typeof window !== "undefined" ? window.location.hostname : "";
+          const localhost =
+            host === "localhost" ||
+            host === "127.0.0.1" ||
+            host === "[::1]";
 
           sdk.Config.init({
             app: appId,
@@ -65,6 +137,7 @@ export function VkIdTokenButton({ onAccessToken, disabled }: VkIdTokenButtonProp
             responseMode: sdk.ConfigResponseMode.Callback,
             source: sdk.ConfigSource.LOWCODE,
             scope,
+            __localhost: localhost,
           });
 
           const oneTap = new sdk.OneTap();
@@ -88,22 +161,27 @@ export function VkIdTokenButton({ onAccessToken, disabled }: VkIdTokenButtonProp
                   setLocalError("VK ID: в ответе нет code или device_id.");
                   return;
                 }
+                const codeVerifier = readVkidSdkCookie("codeVerifier");
+                const state = readVkidSdkCookie("state");
+                if (!codeVerifier || !state) {
+                  setLocalError(
+                    "Нет PKCE-cookies VK ID (codeVerifier/state). Откройте сайт по HTTPS — у VK ID cookies с флагом Secure; на http://localhost они не сохраняются.",
+                  );
+                  return;
+                }
                 try {
-                  const data = await sdk.Auth.exchangeCode(p.code, p.device_id);
+                  const data = await exchangeCodeViaApi({
+                    code: p.code,
+                    device_id: p.device_id,
+                    code_verifier: codeVerifier,
+                    state,
+                  });
+                  clearVkidSdkCookie("codeVerifier");
+                  clearVkidSdkCookie("state");
                   onTokenRef.current(data.access_token);
                   setTokenOk(true);
                 } catch (e: unknown) {
-                  if (
-                    e &&
-                    typeof e === "object" &&
-                    "error_description" in e &&
-                    typeof (e as { error_description?: string }).error_description ===
-                      "string"
-                  ) {
-                    setLocalError(
-                      (e as { error_description: string }).error_description
-                    );
-                  } else if (e instanceof Error) {
+                  if (e instanceof Error) {
                     setLocalError(e.message);
                   } else {
                     setLocalError("Не удалось обменять код на токен (VK ID).");
@@ -145,6 +223,12 @@ export function VkIdTokenButton({ onAccessToken, disabled }: VkIdTokenButtonProp
 
   return (
     <div className="space-y-2">
+      {httpWarn ? (
+        <p className="text-[12px] leading-relaxed text-amber-200/90">
+          Сайт открыт по HTTP: у VK ID cookies с флагом Secure — для входа через виджет
+          нужен HTTPS (например локально через `next dev --experimental-https` или туннель).
+        </p>
+      ) : null}
       <div className="relative w-full overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--background)]">
         {hint ? (
           <p className="p-3 text-[12px] leading-relaxed text-[var(--muted)]">{hint}</p>
