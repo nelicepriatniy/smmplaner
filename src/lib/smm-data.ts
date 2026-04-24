@@ -94,6 +94,10 @@ function enrichClientRecord(
     postsThisMonth,
     postsPendingReview,
     activitySpheres: spheresTuple(c.activitySpheres),
+    contact: c.contact ?? undefined,
+    instagramBusinessId: c.instagramBusinessId ?? undefined,
+    facebookPageId: c.facebookPageId ?? undefined,
+    businessAccountConfirmed: c.businessAccountConfirmed,
   };
 }
 

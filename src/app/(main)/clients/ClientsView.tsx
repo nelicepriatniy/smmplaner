@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 import { ClientFormDialog } from "@/components/clients/ClientFormDialog";
 import { ClientCard } from "@/components/clients/ClientCard";
@@ -17,6 +18,7 @@ function clientsWord(n: number) {
 }
 
 export function ClientsView({ clients }: { clients: ClientRecord[] }) {
+  const router = useRouter();
   const n = clients.length;
   const [formOpen, setFormOpen] = useState(false);
   const [formSession, setFormSession] = useState(0);
@@ -38,6 +40,7 @@ export function ClientsView({ clients }: { clients: ClientRecord[] }) {
         mode="add"
         client={null}
         session={formSession}
+        onSaved={() => router.refresh()}
       />
 
       <header className="mb-8 sm:mb-10">
@@ -58,8 +61,7 @@ export function ClientsView({ clients }: { clients: ClientRecord[] }) {
 
       {n === 0 ? (
         <p className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-8 text-center text-[14px] text-[var(--muted)]">
-          Клиентов пока нет. Запустите сид с демо-данными или добавьте клиента вручную (форма
-          пока без сохранения в БД).
+          Клиентов пока нет. Добавьте клиента кнопкой выше или выполните сид с демо-данными.
         </p>
       ) : (
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">

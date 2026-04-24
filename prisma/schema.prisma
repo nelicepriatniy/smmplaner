@@ -56,6 +56,12 @@ model Client {
   instagramUsername  String   @map("instagram_username")
   /// JSON array of 1–2 sphere labels
   activitySpheres    Json     @map("activity_spheres")
+  contact            String?  @db.Text
+  instagramBusinessId String? @map("instagram_business_id")
+  facebookPageId     String?  @map("facebook_page_id")
+  /// Чувствительные данные: храните БД в доверенной среде; для продакшена рассмотрите шифрование/vault.
+  pageAccessToken    String?  @map("page_access_token") @db.Text
+  businessAccountConfirmed Boolean @default(false) @map("business_account_confirmed")
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 

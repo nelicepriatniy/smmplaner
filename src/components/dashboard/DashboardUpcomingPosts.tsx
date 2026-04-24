@@ -55,7 +55,7 @@ export function DashboardUpcomingPosts({
 
       {posts.length === 0 ? (
         <p className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-6 text-center text-[14px] text-[var(--muted)]">
-          Нет запланированных постов после текущей отметки времени в демо-данных.
+          Нет запланированных постов после текущей отметки времени.
         </p>
       ) : (
         <ul className="flex flex-col gap-3">

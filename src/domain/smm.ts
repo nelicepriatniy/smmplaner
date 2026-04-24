@@ -34,6 +34,11 @@ export type ClientRecord = {
   postsThisMonth: number;
   postsPendingReview: number;
   activitySpheres: [string] | [string, string];
+  /** Поля формы редактирования; токен страницы в клиент не передаём. */
+  contact?: string | null;
+  instagramBusinessId?: string | null;
+  facebookPageId?: string | null;
+  businessAccountConfirmed?: boolean;
 };
 
 export type PostDraftStatus =

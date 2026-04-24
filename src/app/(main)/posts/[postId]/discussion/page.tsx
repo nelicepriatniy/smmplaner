@@ -67,6 +67,7 @@ export default async function PostDiscussionPage({ params }: PageProps) {
       </header>
 
       <PostDiscussionThread
+        postId={post.id}
         initialComments={post.discussion ?? []}
         refMs={refMs}
       />

@@ -127,7 +127,7 @@ export default async function CurrentPostsPage({ searchParams }: PageProps) {
         <p className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-8 text-center text-[14px] text-[var(--muted)]">
           {filterClientId
             ? "У выбранного пользователя пока нет постов в этом списке."
-            : "Постов пока нет. Запустите сид с демо-данными или создайте пост."}
+            : "Постов пока нет. Создайте пост в разделе «Новый пост» или импортируйте демо через сид."}
         </p>
       ) : null}
 

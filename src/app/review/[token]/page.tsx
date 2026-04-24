@@ -29,6 +29,7 @@ export default async function ClientReviewPage({ params }: PageProps) {
 
   const client = await getClientRecordById(post.clientId);
   const refMs = await getServerRefMs();
+  const reviewToken = decodeURIComponent(token).trim();
 
   return (
     <main className="min-h-dvh w-full bg-[var(--background)] px-4 py-8 sm:px-6 sm:py-10">
@@ -49,6 +50,7 @@ export default async function ClientReviewPage({ params }: PageProps) {
         ) : null}
 
         <ClientReviewPanel
+          clientReviewToken={reviewToken}
           postType={post.postType}
           client={client}
           imageUrls={post.imageUrls}

@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { Suspense, useCallback, useState } from "react";
 import Link from "next/link";
 import { ContentCalendar } from "@/components/calendar/ContentCalendar";
@@ -24,6 +25,7 @@ export function ClientDetailView({
   calendarDefaultYear,
   calendarDefaultMonthIndex,
 }: ClientDetailViewProps) {
+  const router = useRouter();
   const [formOpen, setFormOpen] = useState(false);
   const [formSession, setFormSession] = useState(0);
 
@@ -47,6 +49,7 @@ export function ClientDetailView({
         mode="edit"
         client={client}
         session={formSession}
+        onSaved={() => router.refresh()}
       />
 
       <section className="flex min-h-dvh w-full min-w-0 flex-1 flex-col rounded-none border-0 border-[var(--border)] bg-[var(--surface)] sm:rounded-2xl sm:border">

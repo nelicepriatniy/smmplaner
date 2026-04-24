@@ -72,7 +72,12 @@ export default async function EditPostPage({ params, searchParams }: PageProps) 
         </p>
       </header>
 
-      <NewPostEditor key={postId} clients={clients} initialValues={initialValues} />
+      <NewPostEditor
+        key={postId}
+        clients={clients}
+        existingPostId={postId}
+        initialValues={initialValues}
+      />
     </main>
   );
 }

@@ -1,12 +1,23 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useTransition,
+  type FormEvent,
+} from "react";
 import type { ClientRecord } from "@/domain/smm";
+import {
+  createClientAction,
+  updateClientAction,
+} from "@/app/(main)/clients/actions";
 
 const inputClass =
   "w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3.5 py-2.5 text-[15px] text-[var(--foreground)] outline-offset-2 focus:border-[color-mix(in_srgb,var(--accent)_50%,var(--border))] focus:ring-2 focus:ring-[var(--accent-soft)]";
 const btnPrimaryClass =
-  "inline-flex items-center justify-center rounded-xl border border-transparent bg-[var(--surface-elevated)] px-4 py-2.5 text-[14px] font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--border)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]";
+  "inline-flex items-center justify-center rounded-xl border border-transparent bg-[var(--surface-elevated)] px-4 py-2.5 text-[14px] font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--border)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50";
 const btnGhostClass =
   "inline-flex items-center justify-center rounded-xl border border-[var(--border)] bg-transparent px-4 py-2.5 text-[14px] font-medium text-[var(--muted)] transition-colors hover:border-[color-mix(in_srgb,var(--foreground)_12%,var(--border))] hover:text-[var(--foreground)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]";
 
@@ -32,11 +43,11 @@ function buildInitialState(mode: ClientFormMode, client: ClientRecord | null): F
     return {
       fullName: client.fullName,
       instagramUsername: client.instagramUsername,
-      instagramBusinessId: "",
-      facebookPageId: "",
+      instagramBusinessId: client.instagramBusinessId ?? "",
+      facebookPageId: client.facebookPageId ?? "",
       pageAccessToken: "",
-      businessAccountConfirmed: false,
-      contact: "",
+      businessAccountConfirmed: client.businessAccountConfirmed ?? false,
+      contact: client.contact ?? "",
       activitySpheres: client.activitySpheres.join(", "),
     };
   }
@@ -56,39 +67,53 @@ type ClientFormBodyProps = {
   mode: ClientFormMode;
   client: ClientRecord | null;
   onDismiss: () => void;
+  onSaved?: () => void;
 };
 
-function ClientFormBody({ mode, client, onDismiss }: ClientFormBodyProps) {
+function ClientFormBody({ mode, client, onDismiss, onSaved }: ClientFormBodyProps) {
   const formId = useId();
-  const [status, setStatus] = useState<"idle" | "submitted">("idle");
+  const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
+  const [errorMessage, setErrorMessage] = useState("");
   const [values, setValues] = useState<FormState>(() => buildInitialState(mode, client));
+  const [isPending, startTransition] = useTransition();
 
   const setField = <K extends keyof FormState>(k: K, v: FormState[K]) => {
     setValues((p) => ({ ...p, [k]: v }));
   };
 
-  const apiBlockRequired = mode === "add";
-
-  const onSubmit = (e: FormEvent) => {
+  const onSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setStatus("submitted");
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    setErrorMessage("");
+    setStatus("idle");
+
+    startTransition(async () => {
+      const res =
+        mode === "add"
+          ? await createClientAction(fd)
+          : await updateClientAction(client!.id, fd);
+      if (res.ok) {
+        setStatus("success");
+        onSaved?.();
+      } else {
+        setStatus("error");
+        setErrorMessage(res.error);
+      }
+    });
   };
 
   const title = mode === "add" ? "Новый клиент" : "Редактирование клиента";
   const lead =
     mode === "add" ? (
       <>
-        Клиентов подключаем с{" "}
-        <strong className="font-medium text-[var(--foreground)]">бизнес-асом Instagram</strong>,
-        привязанным к{" "}
-        <strong className="font-medium text-[var(--foreground)]">странице Facebook</strong>
-        , чтобы публиковать посты в его аккаунт через API. Сохранение в базу пока не делаем —
-        форма для сбора данных.
+        Укажите контакты и при необходимости данные для публикации через Instagram Graph API
+        (ID бизнес-аса, страницы Facebook, токен). Токен хранится в базе — используйте
+        доверенный сервер и HTTPS.
       </>
     ) : (
       <>
-        Данные взяты из карточки клиента; поля для API (ID, токен) в макете пустые — внесите
-        вручную, когда появятся. Сохранение в базу пока не делаем.
+        Изменения сохраняются в вашей базе данных.
         {client ? (
           <span className="mt-2 block text-[12px] text-[var(--muted)]">ID: {client.id}</span>
         ) : null}
@@ -105,11 +130,11 @@ function ClientFormBody({ mode, client, onDismiss }: ClientFormBodyProps) {
         <p className="mt-2 text-[13px] leading-relaxed text-[var(--muted)]">{lead}</p>
       </div>
 
-      {status === "submitted" ? (
+      {status === "success" ? (
         <div className="mt-6 flex min-h-0 flex-1 flex-col justify-center rounded-xl border border-[color-mix(in_srgb,var(--accent)_30%,var(--border))] bg-[var(--surface-elevated)] px-4 py-8 text-center">
-          <p className="text-[15px] font-medium text-[var(--foreground)]">Форма заполнена</p>
+          <p className="text-[15px] font-medium text-[var(--foreground)]">Сохранено</p>
           <p className="mt-2 text-[13px] text-[var(--muted)]">
-            Данные никуда не отправляются. Подключение к API и хранение токенов появятся отдельно.
+            {mode === "add" ? "Клиент добавлен в список." : "Карточка клиента обновлена."}
           </p>
           <button
             type="button"
@@ -121,6 +146,15 @@ function ClientFormBody({ mode, client, onDismiss }: ClientFormBodyProps) {
         </div>
       ) : (
         <div className="mt-6 min-h-0 flex-1 space-y-4 overflow-y-auto pr-0.5">
+          {status === "error" && errorMessage ? (
+            <p
+              className="rounded-lg border border-rose-500/40 bg-rose-950/30 px-3 py-2 text-[13px] text-rose-100"
+              role="alert"
+            >
+              {errorMessage}
+            </p>
+          ) : null}
+
           <div>
             <label
               htmlFor={`${formId}-name`}
@@ -130,6 +164,7 @@ function ClientFormBody({ mode, client, onDismiss }: ClientFormBodyProps) {
             </label>
             <input
               id={`${formId}-name`}
+              name="fullName"
               className={`mt-2 ${inputClass}`}
               value={values.fullName}
               onChange={(e) => setField("fullName", e.target.value)}
@@ -151,6 +186,7 @@ function ClientFormBody({ mode, client, onDismiss }: ClientFormBodyProps) {
               </span>
               <input
                 id={`${formId}-ig`}
+                name="instagramUsername"
                 className="min-w-0 flex-1 border-0 bg-transparent p-0 text-[15px] text-[var(--foreground)] outline-none"
                 value={values.instagramUsername}
                 onChange={(e) => setField("instagramUsername", stripAt(e.target.value))}
@@ -175,10 +211,10 @@ function ClientFormBody({ mode, client, onDismiss }: ClientFormBodyProps) {
             </label>
             <input
               id={`${formId}-igid`}
+              name="instagramBusinessId"
               className={`mt-2 ${inputClass} font-mono text-[14px]`}
               value={values.instagramBusinessId}
               onChange={(e) => setField("instagramBusinessId", e.target.value.replace(/\D/g, ""))}
-              required={apiBlockRequired}
               inputMode="numeric"
               autoComplete="off"
               placeholder="например 17841405362951494"
@@ -197,16 +233,15 @@ function ClientFormBody({ mode, client, onDismiss }: ClientFormBodyProps) {
             </label>
             <input
               id={`${formId}-pageid`}
+              name="facebookPageId"
               className={`mt-2 ${inputClass} font-mono text-[14px]`}
               value={values.facebookPageId}
               onChange={(e) => setField("facebookPageId", e.target.value.replace(/\D/g, ""))}
-              required={apiBlockRequired}
               inputMode="numeric"
               autoComplete="off"
             />
             <p className="mt-1 text-[12px] text-[var(--muted)]">
-              К странице обычно привязан Instagram Business, без неё публикация в IG из API
-              недоступна.
+              К странице обычно привязан Instagram Business.
             </p>
           </div>
 
@@ -219,17 +254,20 @@ function ClientFormBody({ mode, client, onDismiss }: ClientFormBodyProps) {
             </label>
             <textarea
               id={`${formId}-token`}
+              name="pageAccessToken"
               className={`mt-2 min-h-[4.5rem] resize-y ${inputClass} font-mono text-[12px] leading-normal`}
               value={values.pageAccessToken}
               onChange={(e) => setField("pageAccessToken", e.target.value)}
-              required={apiBlockRequired}
               autoComplete="off"
               rows={3}
-              placeholder="Долгоживущий токен страницы с нужными scope…"
+              placeholder={
+                mode === "edit"
+                  ? "Оставьте пустым, чтобы не менять сохранённый токен; вставьте новый, чтобы заменить."
+                  : "Долгоживущий токен страницы с нужными scope…"
+              }
             />
             <p className="mt-1 text-[12px] text-[var(--muted)]">
-              С правами на публикацию в Instagram (и чтение страницы). В будущем хранится только
-              на сервере.
+              Хранится в БД на сервере; не передаётся обратно в форму при редактировании.
             </p>
           </div>
 
@@ -237,10 +275,11 @@ function ClientFormBody({ mode, client, onDismiss }: ClientFormBodyProps) {
             <input
               id={`${formId}-biz`}
               type="checkbox"
+              name="businessAccountConfirmed"
+              value="on"
               className="mt-0.5 size-4 shrink-0 cursor-pointer rounded border border-[var(--border)] bg-[var(--surface)] text-[var(--accent)]"
               checked={values.businessAccountConfirmed}
               onChange={(e) => setField("businessAccountConfirmed", e.target.checked)}
-              required={apiBlockRequired}
             />
             <label
               htmlFor={`${formId}-biz`}
@@ -260,6 +299,7 @@ function ClientFormBody({ mode, client, onDismiss }: ClientFormBodyProps) {
             </label>
             <input
               id={`${formId}-contact`}
+              name="contact"
               className={`mt-2 ${inputClass}`}
               value={values.contact}
               onChange={(e) => setField("contact", e.target.value)}
@@ -277,6 +317,7 @@ function ClientFormBody({ mode, client, onDismiss }: ClientFormBodyProps) {
             </label>
             <input
               id={`${formId}-spheres`}
+              name="activitySpheres"
               className={`mt-2 ${inputClass}`}
               value={values.activitySpheres}
               onChange={(e) => setField("activitySpheres", e.target.value)}
@@ -288,13 +329,18 @@ function ClientFormBody({ mode, client, onDismiss }: ClientFormBodyProps) {
         </div>
       )}
 
-      {status === "submitted" ? null : (
+      {status === "success" ? null : (
         <div className="mt-6 flex flex-wrap justify-end gap-2 border-t border-[var(--border)] pt-5 sm:gap-3">
-          <button type="button" onClick={onDismiss} className={btnGhostClass}>
+          <button
+            type="button"
+            onClick={onDismiss}
+            className={btnGhostClass}
+            disabled={isPending}
+          >
             Отмена
           </button>
-          <button type="submit" className={btnPrimaryClass}>
-            Готово (без сохранения)
+          <button type="submit" className={btnPrimaryClass} disabled={isPending}>
+            {isPending ? "Сохранение…" : "Сохранить"}
           </button>
         </div>
       )}
@@ -309,6 +355,8 @@ export type ClientFormDialogProps = {
   client: ClientRecord | null;
   /** Увеличивайте при каждом открытии, чтобы форма монтировалась с чистыми/новыми значениями. */
   session: number;
+  /** После успешного сохранения (например router.refresh). */
+  onSaved?: () => void;
 };
 
 export function ClientFormDialog({
@@ -317,6 +365,7 @@ export function ClientFormDialog({
   mode,
   client,
   session,
+  onSaved,
 }: ClientFormDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
@@ -349,6 +398,7 @@ export function ClientFormDialog({
               mode={mode}
               client={client}
               onDismiss={onRequestClose}
+              onSaved={onSaved}
             />
           </div>
         </div>

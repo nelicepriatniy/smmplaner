@@ -1,6 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import {
+  createDraftPostAction,
+  updatePostAction,
+} from "@/app/(main)/posts/actions";
 import type { ClientRecord, PostEditorInitialValues } from "@/domain/smm";
 import {
   isFeedLikePostType,
@@ -17,6 +22,8 @@ import {
 
 type NewPostEditorProps = {
   clients: ClientRecord[];
+  /** Редактирование существующего поста (вместе с initialValues). */
+  existingPostId?: string;
   /** Если задано — форма открывается с данными черновика (страница редактирования). */
   initialValues?: PostEditorInitialValues | null;
   /**
@@ -56,11 +63,15 @@ function seedForNew(
 
 export function NewPostEditor({
   clients,
+  existingPostId,
   initialValues = null,
   initialClientId,
   duplicateFrom = null,
 }: NewPostEditorProps) {
-  const isEditMode = initialValues != null;
+  const router = useRouter();
+  const [isSaving, startTransition] = useTransition();
+  const [saveError, setSaveError] = useState("");
+  const isEditMode = initialValues != null && Boolean(existingPostId);
   const seed = seedForNew(initialValues, duplicateFrom);
 
   const [clientId, setClientId] = useState(() =>
@@ -140,6 +151,67 @@ export function NewPostEditor({
       });
     };
   }, [imageUrls]);
+
+  const buildPayload = useCallback(() => {
+    return {
+      clientId,
+      postType,
+      caption,
+      location,
+      firstComment,
+      altText,
+      imageUrls,
+      publishDate: publishSchedule.date,
+      publishTime: publishSchedule.time,
+    };
+  }, [
+    clientId,
+    postType,
+    caption,
+    location,
+    firstComment,
+    altText,
+    imageUrls,
+    publishSchedule.date,
+    publishSchedule.time,
+  ]);
+
+  const savePost = useCallback(() => {
+    setSaveError("");
+    if (!clientId || !clients.some((c) => c.id === clientId)) {
+      setSaveError("Выберите клиента.");
+      return;
+    }
+    startTransition(async () => {
+      const payload = buildPayload();
+      if (isEditMode && existingPostId) {
+        const res = await updatePostAction(existingPostId, payload);
+        if (!res.ok) {
+          setSaveError(res.error);
+          return;
+        }
+        router.refresh();
+        return;
+      }
+      const res = await createDraftPostAction(payload);
+      if (!res.ok) {
+        setSaveError(res.error);
+        return;
+      }
+      if (res.postId) {
+        router.push(`/posts/${res.postId}/edit`);
+      }
+    });
+  }, [
+    buildPayload,
+    clientId,
+    clients,
+    existingPostId,
+    isEditMode,
+    router,
+  ]);
+
+  const canSave = clients.length > 0 && Boolean(clientId);
 
   return (
     <div className="grid w-full gap-10 py-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,26.25rem)] lg:items-start">
@@ -312,25 +384,39 @@ export function NewPostEditor({
           </div>
         </div>
 
+        {saveError ? (
+          <p
+            className="mt-4 rounded-lg border border-rose-500/40 bg-rose-950/30 px-3 py-2 text-[13px] text-rose-100"
+            role="alert"
+          >
+            {saveError}
+          </p>
+        ) : null}
+        <p className="mt-2 text-[12px] text-[var(--muted)]">
+          В черновик попадают только ссылки на изображения (http/https). Локальные файлы из
+          браузера не загружаются на сервер — замените на URL после выгрузки в хранилище.
+        </p>
+
         <div className="mt-8 flex flex-row flex-wrap items-center gap-3">
           {isEditMode ? (
             <button
               type="button"
-              className="rounded-xl bg-[var(--accent)] px-5 py-2.5 text-[14px] font-semibold text-[#0e1016] transition-opacity hover:opacity-90"
+              onClick={savePost}
+              disabled={!canSave || isSaving}
+              className="rounded-xl bg-[var(--accent)] px-5 py-2.5 text-[14px] font-semibold text-[#0e1016] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Сохранить
+              {isSaving ? "Сохранение…" : "Сохранить"}
             </button>
-          ) : null}
-          <button
-            type="button"
-            className={
-              isEditMode
-                ? "rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] px-5 py-2.5 text-[14px] font-medium text-[var(--foreground)] transition-opacity hover:opacity-90"
-                : "rounded-xl bg-[var(--accent)] px-5 py-2.5 text-[14px] font-semibold text-[#0e1016] transition-opacity hover:opacity-90"
-            }
-          >
-            Сохранить в черновики
-          </button>
+          ) : (
+            <button
+              type="button"
+              onClick={savePost}
+              disabled={!canSave || isSaving}
+              className="rounded-xl bg-[var(--accent)] px-5 py-2.5 text-[14px] font-semibold text-[#0e1016] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isSaving ? "Сохранение…" : "Сохранить в черновики"}
+            </button>
+          )}
         </div>
       </section>
 
