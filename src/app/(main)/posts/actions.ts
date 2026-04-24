@@ -3,8 +3,10 @@
 import { revalidatePath } from "next/cache";
 import type { PostContentType, PostDraftStatus } from "@prisma/client";
 import { auth } from "@/auth";
+import { getAppBaseUrl } from "@/lib/app-base-url";
 import { newClientReviewToken } from "@/lib/clientReviewToken";
 import { prisma } from "@/lib/prisma";
+import { sendPostToTelegramChat } from "@/lib/telegram-send";
 import type { PostType } from "@/types/postType";
 
 export type PostActionResult =
@@ -28,8 +30,15 @@ async function requireUserId(): Promise<string | null> {
   return s?.user?.id ?? null;
 }
 
-function filterRemoteImageUrls(urls: string[]): string[] {
-  return urls.filter((u) => /^https?:\/\//i.test(u));
+/** Разрешённые URL изображений: внешние http(s) и файлы, загруженные в public/uploads/posts. */
+function sanitizeImageUrlsForStorage(urls: string[]): string[] {
+  return urls.filter((u) => {
+    if (/^https?:\/\//i.test(u)) return true;
+    if (!u.startsWith("/uploads/posts/")) return false;
+    if (u.includes("..")) return false;
+    // /uploads/posts/{userId}/{filename}
+    return /^\/uploads\/posts\/[a-z0-9_-]+\/[a-z0-9_.-]+$/i.test(u);
+  });
 }
 
 function revalidatePostPaths(userId: string, postId: string, clientId: string) {
@@ -55,7 +64,7 @@ async function createPostWithStatus(
   });
   if (!client) return { ok: false, error: "Клиент не найден." };
 
-  const imageUrls = filterRemoteImageUrls(payload.imageUrls);
+  const imageUrls = sanitizeImageUrlsForStorage(payload.imageUrls);
   const token = newClientReviewToken();
 
   try {
@@ -121,7 +130,7 @@ export async function updatePostAction(
   });
   if (!client) return { ok: false, error: "Клиент не найден." };
 
-  const imageUrls = filterRemoteImageUrls(payload.imageUrls);
+  const imageUrls = sanitizeImageUrlsForStorage(payload.imageUrls);
 
   try {
     await prisma.post.update({
@@ -144,6 +153,110 @@ export async function updatePostAction(
   } catch (e) {
     console.error(e);
     return { ok: false, error: "Не удалось сохранить пост." };
+  }
+}
+
+/**
+ * Сохраняет поля поста из формы, отправляет в Telegram и ставит статус «опубликован».
+ * Доступно только для клиентов с платформой Telegram (токен и chat id).
+ */
+export async function publishPostNowAction(
+  postId: string,
+  payload: PostSavePayload
+): Promise<PostActionResult> {
+  const userId = await requireUserId();
+  if (!userId) return { ok: false, error: "Нужна авторизация." };
+
+  const existing = await prisma.post.findFirst({
+    where: { id: postId, userId },
+  });
+  if (!existing) return { ok: false, error: "Пост не найден." };
+
+  if (existing.status === "published") {
+    return { ok: false, error: "Пост уже опубликован." };
+  }
+  if (existing.status === "rejected") {
+    return { ok: false, error: "Отклонённый пост нельзя опубликовать." };
+  }
+
+  const client = await prisma.client.findFirst({
+    where: { id: payload.clientId, userId },
+  });
+  if (!client) return { ok: false, error: "Клиент не найден." };
+
+  if (client.platform !== "telegram") {
+    return {
+      ok: false,
+      error: "Мгновенная публикация пока доступна только для клиентов Telegram.",
+    };
+  }
+
+  const botToken = client.telegramBotToken?.trim();
+  const chatId = client.telegramChatId?.trim();
+  if (!botToken || !chatId) {
+    return {
+      ok: false,
+      error: "У клиента Telegram не заданы токен бота или ID чата.",
+    };
+  }
+
+  const imageUrls = sanitizeImageUrlsForStorage(payload.imageUrls);
+  const appBaseUrl = getAppBaseUrl();
+
+  const send = await sendPostToTelegramChat({
+    botToken,
+    chatId,
+    caption: payload.caption,
+    imageUrls,
+    appBaseUrl,
+  });
+
+  if (!send.ok) {
+    return { ok: false, error: send.error };
+  }
+
+  try {
+    await prisma.$transaction([
+      prisma.post.update({
+        where: { id: postId },
+        data: {
+          clientId: payload.clientId,
+          postType: payload.postType as PostContentType,
+          caption: payload.caption,
+          location: payload.location,
+          firstComment: payload.firstComment,
+          altText: payload.altText,
+          imageUrls,
+          publishDate: payload.publishDate,
+          publishTime: payload.publishTime,
+          status: "published",
+        },
+      }),
+      prisma.activity.create({
+        data: {
+          userId,
+          kind: "post_published",
+          createdAt: new Date(),
+          title: "Пост опубликован в Telegram",
+          detail: payload.caption.trim().slice(0, 200) || undefined,
+          postId,
+          clientId: payload.clientId,
+        },
+      }),
+    ]);
+
+    revalidatePostPaths(userId, postId, payload.clientId);
+    if (existing.clientId !== payload.clientId) {
+      revalidatePath(`/clients/${existing.clientId}`);
+    }
+    return { ok: true, postId };
+  } catch (e) {
+    console.error(e);
+    return {
+      ok: false,
+      error:
+        "Сообщение ушло в Telegram, но не удалось обновить статус в базе. Проверьте пост вручную.",
+    };
   }
 }
 

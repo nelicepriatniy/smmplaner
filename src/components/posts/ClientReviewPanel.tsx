@@ -7,6 +7,7 @@ import {
   rejectPostByTokenAction,
 } from "@/app/review/actions";
 import { InstagramPostPreview } from "@/components/posts/InstagramPostPreview";
+import { TelegramPostPreview } from "@/components/posts/TelegramPostPreview";
 import { ClientPortalDiscussion } from "@/components/posts/ClientPortalDiscussion";
 import type { PostReviewComment } from "@/components/posts/postReviewTypes";
 import type { ClientRecord } from "@/domain/smm";
@@ -76,15 +77,23 @@ export function ClientReviewPanel({
         className="flex w-full min-w-0 max-w-full justify-center rounded-2xl border border-[#efefef] p-4"
         style={{ background: "#fafafa" }}
       >
-        <InstagramPostPreview
-          postType={postType}
-          client={client}
-          imageUrls={imageUrls}
-          caption={caption}
-          location={location}
-          firstComment={firstComment}
-          altText={altText}
-        />
+        {client?.platform === "telegram" ? (
+          <TelegramPostPreview
+            client={client}
+            imageUrls={imageUrls}
+            caption={caption}
+          />
+        ) : (
+          <InstagramPostPreview
+            postType={postType}
+            client={client}
+            imageUrls={imageUrls}
+            caption={caption}
+            location={location}
+            firstComment={firstComment}
+            altText={altText}
+          />
+        )}
       </div>
 
       <ClientPortalDiscussion

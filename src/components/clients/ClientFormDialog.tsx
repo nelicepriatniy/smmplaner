@@ -8,7 +8,7 @@ import {
   useTransition,
   type FormEvent,
 } from "react";
-import type { ClientRecord } from "@/domain/smm";
+import type { ClientPlatform, ClientRecord } from "@/domain/smm";
 import {
   createClientAction,
   updateClientAction,
@@ -28,6 +28,7 @@ function stripAt(handle: string): string {
 export type ClientFormMode = "add" | "edit";
 
 type FormState = {
+  platform: ClientPlatform;
   fullName: string;
   instagramUsername: string;
   instagramBusinessId: string;
@@ -36,11 +37,14 @@ type FormState = {
   businessAccountConfirmed: boolean;
   contact: string;
   activitySpheres: string;
+  telegramBotToken: string;
+  telegramChatId: string;
 };
 
 function buildInitialState(mode: ClientFormMode, client: ClientRecord | null): FormState {
   if (mode === "edit" && client) {
     return {
+      platform: client.platform,
       fullName: client.fullName,
       instagramUsername: client.instagramUsername,
       instagramBusinessId: client.instagramBusinessId ?? "",
@@ -49,9 +53,12 @@ function buildInitialState(mode: ClientFormMode, client: ClientRecord | null): F
       businessAccountConfirmed: client.businessAccountConfirmed ?? false,
       contact: client.contact ?? "",
       activitySpheres: client.activitySpheres.join(", "),
+      telegramBotToken: "",
+      telegramChatId: client.telegramChatId ?? "",
     };
   }
   return {
+    platform: "instagram",
     fullName: "",
     instagramUsername: "",
     instagramBusinessId: "",
@@ -60,6 +67,8 @@ function buildInitialState(mode: ClientFormMode, client: ClientRecord | null): F
     businessAccountConfirmed: false,
     contact: "",
     activitySpheres: "",
+    telegramBotToken: "",
+    telegramChatId: "",
   };
 }
 
@@ -106,11 +115,18 @@ function ClientFormBody({ mode, client, onDismiss, onSaved }: ClientFormBodyProp
   const title = mode === "add" ? "Новый клиент" : "Редактирование клиента";
   const lead =
     mode === "add" ? (
-      <>
-        Укажите контакты и при необходимости данные для публикации через Instagram Graph API
-        (ID бизнес-аса, страницы Facebook, токен). Токен хранится в базе — используйте
-        доверенный сервер и HTTPS.
-      </>
+      values.platform === "telegram" ? (
+        <>
+          Посты для этого клиента планируются для отправки в указанный Telegram-чат через вашего
+          бота (токен от @BotFather и ID чата сохраняются в базе).
+        </>
+      ) : (
+        <>
+          Укажите контакты и при необходимости данные для публикации через Instagram Graph API
+          (ID бизнес-аса, страницы Facebook, токен). Токен хранится в базе — используйте
+          доверенный сервер и HTTPS.
+        </>
+      )
     ) : (
       <>
         Изменения сохраняются в вашей базе данных.
@@ -155,6 +171,42 @@ function ClientFormBody({ mode, client, onDismiss, onSaved }: ClientFormBodyProp
             </p>
           ) : null}
 
+          <input type="hidden" name="platform" value={values.platform} />
+
+          <div role="radiogroup" aria-label="Платформа публикаций">
+            <span className="text-[14px] font-medium text-[var(--foreground)]">
+              Платформа
+            </span>
+            <div className="mt-2 flex gap-2">
+              <button
+                type="button"
+                className={`flex-1 rounded-xl border px-3 py-2.5 text-[14px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
+                  values.platform === "instagram"
+                    ? "border-[color-mix(in_srgb,var(--accent)_45%,var(--border))] bg-[var(--surface-elevated)] text-[var(--foreground)]"
+                    : "border-[var(--border)] bg-[var(--background)] text-[var(--muted)] hover:text-[var(--foreground)]"
+                }`}
+                aria-checked={values.platform === "instagram"}
+                role="radio"
+                onClick={() => setField("platform", "instagram")}
+              >
+                Instagram
+              </button>
+              <button
+                type="button"
+                className={`flex-1 rounded-xl border px-3 py-2.5 text-[14px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
+                  values.platform === "telegram"
+                    ? "border-[color-mix(in_srgb,var(--accent)_45%,var(--border))] bg-[var(--surface-elevated)] text-[var(--foreground)]"
+                    : "border-[var(--border)] bg-[var(--background)] text-[var(--muted)] hover:text-[var(--foreground)]"
+                }`}
+                aria-checked={values.platform === "telegram"}
+                role="radio"
+                onClick={() => setField("platform", "telegram")}
+              >
+                Telegram
+              </button>
+            </div>
+          </div>
+
           <div>
             <label
               htmlFor={`${formId}-name`}
@@ -173,122 +225,190 @@ function ClientFormBody({ mode, client, onDismiss, onSaved }: ClientFormBodyProp
             />
           </div>
 
-          <div>
-            <label
-              htmlFor={`${formId}-ig`}
-              className="text-[14px] font-medium text-[var(--foreground)]"
-            >
-              Логин Instagram
-            </label>
-            <div className="mt-2 flex items-center gap-1 rounded-xl border border-[var(--border)] bg-[var(--background)] px-3.5 py-2.5 has-[:focus-within]:border-[color-mix(in_srgb,var(--accent)_50%,var(--border))] has-[:focus-within]:ring-2 has-[:focus-within]:ring-[var(--accent-soft)]">
-              <span className="select-none text-[15px] text-[var(--muted)]" aria-hidden>
-                @
-              </span>
-              <input
-                id={`${formId}-ig`}
-                name="instagramUsername"
-                className="min-w-0 flex-1 border-0 bg-transparent p-0 text-[15px] text-[var(--foreground)] outline-none"
-                value={values.instagramUsername}
-                onChange={(e) => setField("instagramUsername", stripAt(e.target.value))}
-                required
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                inputMode="text"
-                placeholder="username"
-                autoComplete="off"
-              />
-            </div>
-            <p className="mt-1 text-[12px] text-[var(--muted)]">Без @, только имя.</p>
-          </div>
+          {values.platform === "instagram" ? (
+            <>
+              <div>
+                <label
+                  htmlFor={`${formId}-ig`}
+                  className="text-[14px] font-medium text-[var(--foreground)]"
+                >
+                  Логин Instagram
+                </label>
+                <div className="mt-2 flex items-center gap-1 rounded-xl border border-[var(--border)] bg-[var(--background)] px-3.5 py-2.5 has-[:focus-within]:border-[color-mix(in_srgb,var(--accent)_50%,var(--border))] has-[:focus-within]:ring-2 has-[:focus-within]:ring-[var(--accent-soft)]">
+                  <span className="select-none text-[15px] text-[var(--muted)]" aria-hidden>
+                    @
+                  </span>
+                  <input
+                    id={`${formId}-ig`}
+                    name="instagramUsername"
+                    className="min-w-0 flex-1 border-0 bg-transparent p-0 text-[15px] text-[var(--foreground)] outline-none"
+                    value={values.instagramUsername}
+                    onChange={(e) =>
+                      setField("instagramUsername", stripAt(e.target.value))
+                    }
+                    required
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    inputMode="text"
+                    placeholder="username"
+                    autoComplete="off"
+                  />
+                </div>
+                <p className="mt-1 text-[12px] text-[var(--muted)]">Без @, только имя.</p>
+              </div>
 
-          <div>
-            <label
-              htmlFor={`${formId}-igid`}
-              className="text-[14px] font-medium text-[var(--foreground)]"
-            >
-              ID Instagram Business (IG User)
-            </label>
-            <input
-              id={`${formId}-igid`}
-              name="instagramBusinessId"
-              className={`mt-2 ${inputClass} font-mono text-[14px]`}
-              value={values.instagramBusinessId}
-              onChange={(e) => setField("instagramBusinessId", e.target.value.replace(/\D/g, ""))}
-              inputMode="numeric"
-              autoComplete="off"
-              placeholder="например 17841405362951494"
-            />
-            <p className="mt-1 text-[12px] text-[var(--muted)]">
-              В Graph API — идентификатор бизнес-аса для публикации.
-            </p>
-          </div>
+              <div>
+                <label
+                  htmlFor={`${formId}-igid`}
+                  className="text-[14px] font-medium text-[var(--foreground)]"
+                >
+                  ID Instagram Business (IG User)
+                </label>
+                <input
+                  id={`${formId}-igid`}
+                  name="instagramBusinessId"
+                  className={`mt-2 ${inputClass} font-mono text-[14px]`}
+                  value={values.instagramBusinessId}
+                  onChange={(e) =>
+                    setField("instagramBusinessId", e.target.value.replace(/\D/g, ""))
+                  }
+                  inputMode="numeric"
+                  autoComplete="off"
+                  placeholder="например 17841405362951494"
+                />
+                <p className="mt-1 text-[12px] text-[var(--muted)]">
+                  В Graph API — идентификатор бизнес-аса для публикации.
+                </p>
+              </div>
 
-          <div>
-            <label
-              htmlFor={`${formId}-pageid`}
-              className="text-[14px] font-medium text-[var(--foreground)]"
-            >
-              ID Facebook Page
-            </label>
-            <input
-              id={`${formId}-pageid`}
-              name="facebookPageId"
-              className={`mt-2 ${inputClass} font-mono text-[14px]`}
-              value={values.facebookPageId}
-              onChange={(e) => setField("facebookPageId", e.target.value.replace(/\D/g, ""))}
-              inputMode="numeric"
-              autoComplete="off"
-            />
-            <p className="mt-1 text-[12px] text-[var(--muted)]">
-              К странице обычно привязан Instagram Business.
-            </p>
-          </div>
+              <div>
+                <label
+                  htmlFor={`${formId}-pageid`}
+                  className="text-[14px] font-medium text-[var(--foreground)]"
+                >
+                  ID Facebook Page
+                </label>
+                <input
+                  id={`${formId}-pageid`}
+                  name="facebookPageId"
+                  className={`mt-2 ${inputClass} font-mono text-[14px]`}
+                  value={values.facebookPageId}
+                  onChange={(e) =>
+                    setField("facebookPageId", e.target.value.replace(/\D/g, ""))
+                  }
+                  inputMode="numeric"
+                  autoComplete="off"
+                />
+                <p className="mt-1 text-[12px] text-[var(--muted)]">
+                  К странице обычно привязан Instagram Business.
+                </p>
+              </div>
 
-          <div>
-            <label
-              htmlFor={`${formId}-token`}
-              className="text-[14px] font-medium text-[var(--foreground)]"
-            >
-              Page access token
-            </label>
-            <textarea
-              id={`${formId}-token`}
-              name="pageAccessToken"
-              className={`mt-2 min-h-[4.5rem] resize-y ${inputClass} font-mono text-[12px] leading-normal`}
-              value={values.pageAccessToken}
-              onChange={(e) => setField("pageAccessToken", e.target.value)}
-              autoComplete="off"
-              rows={3}
-              placeholder={
-                mode === "edit"
-                  ? "Оставьте пустым, чтобы не менять сохранённый токен; вставьте новый, чтобы заменить."
-                  : "Долгоживущий токен страницы с нужными scope…"
-              }
-            />
-            <p className="mt-1 text-[12px] text-[var(--muted)]">
-              Хранится в БД на сервере; не передаётся обратно в форму при редактировании.
-            </p>
-          </div>
+              <div>
+                <label
+                  htmlFor={`${formId}-token`}
+                  className="text-[14px] font-medium text-[var(--foreground)]"
+                >
+                  Page access token
+                </label>
+                <textarea
+                  id={`${formId}-token`}
+                  name="pageAccessToken"
+                  className={`mt-2 min-h-[4.5rem] resize-y ${inputClass} font-mono text-[12px] leading-normal`}
+                  value={values.pageAccessToken}
+                  onChange={(e) => setField("pageAccessToken", e.target.value)}
+                  autoComplete="off"
+                  rows={3}
+                  placeholder={
+                    mode === "edit"
+                      ? "Оставьте пустым, чтобы не менять сохранённый токен; вставьте новый, чтобы заменить."
+                      : "Долгоживущий токен страницы с нужными scope…"
+                  }
+                />
+                <p className="mt-1 text-[12px] text-[var(--muted)]">
+                  Хранится в БД на сервере; не передаётся обратно в форму при редактировании.
+                </p>
+              </div>
 
-          <div className="flex gap-3 rounded-xl border border-[var(--border)] bg-[var(--background)] p-3.5">
-            <input
-              id={`${formId}-biz`}
-              type="checkbox"
-              name="businessAccountConfirmed"
-              value="on"
-              className="mt-0.5 size-4 shrink-0 cursor-pointer rounded border border-[var(--border)] bg-[var(--surface)] text-[var(--accent)]"
-              checked={values.businessAccountConfirmed}
-              onChange={(e) => setField("businessAccountConfirmed", e.target.checked)}
-            />
-            <label
-              htmlFor={`${formId}-biz`}
-              className="cursor-pointer text-[13px] leading-snug text-[var(--foreground)]"
-            >
-              Аккаунт Instagram в режиме Business / Creator, к Facebook Page и к вашему
-              приложению (или Business Manager) он подключён, права согласованы с клиентом
-            </label>
-          </div>
+              <div className="flex gap-3 rounded-xl border border-[var(--border)] bg-[var(--background)] p-3.5">
+                <input
+                  id={`${formId}-biz`}
+                  type="checkbox"
+                  name="businessAccountConfirmed"
+                  value="on"
+                  className="mt-0.5 size-4 shrink-0 cursor-pointer rounded border border-[var(--border)] bg-[var(--surface)] text-[var(--accent)]"
+                  checked={values.businessAccountConfirmed}
+                  onChange={(e) =>
+                    setField("businessAccountConfirmed", e.target.checked)
+                  }
+                />
+                <label
+                  htmlFor={`${formId}-biz`}
+                  className="cursor-pointer text-[13px] leading-snug text-[var(--foreground)]"
+                >
+                  Аккаунт Instagram в режиме Business / Creator, к Facebook Page и к вашему
+                  приложению (или Business Manager) он подключён, права согласованы с клиентом
+                </label>
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <label
+                  htmlFor={`${formId}-tgbot`}
+                  className="text-[14px] font-medium text-[var(--foreground)]"
+                >
+                  Токен бота
+                </label>
+                <textarea
+                  id={`${formId}-tgbot`}
+                  name="telegramBotToken"
+                  className={`mt-2 min-h-[4.5rem] resize-y ${inputClass} font-mono text-[12px] leading-normal`}
+                  value={values.telegramBotToken}
+                  onChange={(e) => setField("telegramBotToken", e.target.value)}
+                  required={
+                    mode === "add" ||
+                    (mode === "edit" && client != null && !client.hasTelegramBotToken)
+                  }
+                  autoComplete="off"
+                  rows={3}
+                  placeholder="123456789:AA… (от @BotFather)"
+                />
+                <p className="mt-1 text-[12px] text-[var(--muted)]">
+                  Полная строка токена — в БД на сервере; в форму при редактировании не
+                  подставляется.
+                  {mode === "edit" && client?.hasTelegramBotToken ? (
+                    <span className="mt-1 block">
+                      Оставьте поле пустым, чтобы не менять сохранённый токен; вставьте новый,
+                      чтобы заменить.
+                    </span>
+                  ) : null}
+                </p>
+              </div>
+              <div>
+                <label
+                  htmlFor={`${formId}-tgchat`}
+                  className="text-[14px] font-medium text-[var(--foreground)]"
+                >
+                  ID чата для постов
+                </label>
+                <input
+                  id={`${formId}-tgchat`}
+                  name="telegramChatId"
+                  className={`mt-2 ${inputClass} font-mono text-[14px]`}
+                  value={values.telegramChatId}
+                  onChange={(e) => setField("telegramChatId", e.target.value)}
+                  required
+                  autoComplete="off"
+                  placeholder="например -1001234567890 или @channelusername"
+                />
+                <p className="mt-1 text-[12px] text-[var(--muted)]">
+                  Канал, группа или чат, куда будут уходить материалы этого клиента.
+                </p>
+              </div>
+            </>
+          )}
 
           <div>
             <label

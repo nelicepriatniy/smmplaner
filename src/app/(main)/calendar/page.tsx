@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { calendarAnchorFromPosts } from "@/domain/smm";
+import { calendarAnchorFromPosts, clientSelectLabel } from "@/domain/smm";
 import { CalendarWithClientFilter } from "./CalendarWithClientFilter";
 import { getServerRefMs } from "@/lib/serverRefMs";
 import {
@@ -38,7 +38,7 @@ export default async function CalendarPage({ searchParams }: PageProps) {
 
   const filterOptions = clients.map((c) => ({
     id: c.id,
-    label: `${c.fullName} (@${c.instagramUsername})`,
+    label: clientSelectLabel(c),
   }));
 
   const anchor = calendarAnchorFromPosts(displayPosts);

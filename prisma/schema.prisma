@@ -36,6 +36,11 @@ enum ActivityKind {
   post_scheduled
 }
 
+enum ClientPlatform {
+  instagram
+  telegram
+}
+
 model User {
   id           String     @id @default(cuid())
   email        String     @unique
@@ -53,6 +58,7 @@ model Client {
   id                 String   @id @default(cuid())
   userId             String   @map("user_id")
   fullName           String   @map("full_name")
+  platform           ClientPlatform @default(instagram) @map("platform")
   instagramUsername  String   @map("instagram_username")
   /// JSON array of 1–2 sphere labels
   activitySpheres    Json     @map("activity_spheres")
@@ -62,6 +68,10 @@ model Client {
   /// Чувствительные данные: храните БД в доверенной среде; для продакшена рассмотрите шифрование/vault.
   pageAccessToken    String?  @map("page_access_token") @db.Text
   businessAccountConfirmed Boolean @default(false) @map("business_account_confirmed")
+  /// Токен бота от @BotFather (секрет); для отправки в Telegram Bot API.
+  telegramBotToken   String?  @map("telegram_bot_token") @db.Text
+  /// ID чата/канала, куда отправлять посты.
+  telegramChatId     String?  @map("telegram_chat_id") @db.Text
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 

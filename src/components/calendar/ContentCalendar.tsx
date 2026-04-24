@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useLayoutEffect, useMemo, useState } from "react";
 import {
+  clientCalendarShortHandle,
   POST_DRAFT_STATUS_LABELS,
   type ClientRecord,
   type PostDraftRecord,
@@ -199,15 +200,17 @@ export function ContentCalendar({
               <ul className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
                 {dayPosts.map((post) => {
                   const client = clientById[post.clientId];
-                  const label = client?.instagramUsername ?? post.clientId;
+                  const label = clientCalendarShortHandle(client, post.clientId);
                   const borderColor = BORDER_BY_STATUS[post.status];
                   const captionLine =
                     post.caption.split("\n").find((l) => l.trim())?.slice(0, 140) ?? "";
                   const timePart = `${POST_DRAFT_STATUS_LABELS[post.status]} · ${timeShort(
                     post.publishTime
                   )}`;
+                  const clientSlot =
+                    client?.platform === "telegram" ? `TG ${label}` : `@${label}`;
                   const title = showClientInSlot
-                    ? `${timePart} · @${label}\n${captionLine}`
+                    ? `${timePart} · ${clientSlot}\n${captionLine}`
                     : `${timePart}\n${captionLine}`;
 
                   return (
@@ -222,7 +225,13 @@ export function ContentCalendar({
                           {timeShort(post.publishTime)}
                         </span>
                         {showClientInSlot ? (
-                          <span className="text-[var(--foreground)]"> @{label}</span>
+                          <span className="text-[var(--foreground)]">
+                            {client?.platform === "telegram" ? (
+                              <> {label}</>
+                            ) : (
+                              <> @{label}</>
+                            )}
+                          </span>
                         ) : null}
                         <span className="mt-0.5 block truncate text-[var(--muted)]">
                           {POST_TYPE_ABBR[post.postType]}

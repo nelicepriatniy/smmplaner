@@ -11,6 +11,12 @@ export function ClientCard({ client }: ClientCardProps) {
   const router = useRouter();
   const ig = client.instagramUsername;
   const igUrl = `https://www.instagram.com/${encodeURIComponent(ig)}/`;
+  const subtitle =
+    client.platform === "telegram"
+      ? client.telegramChatId?.trim()
+        ? `Telegram · чат ${client.telegramChatId.trim()}`
+        : "Telegram"
+      : null;
 
   const goToClient = () => {
     router.push(`/clients/${client.id}`);
@@ -33,16 +39,20 @@ export function ClientCard({ client }: ClientCardProps) {
       <h2 className="text-[16px] font-semibold leading-snug text-[var(--foreground)]">
         {client.fullName}
       </h2>
-      <a
-        href={igUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-        className="mt-1.5 inline-flex w-fit text-[13px] text-[var(--muted)] underline-offset-2 transition-colors hover:text-[var(--accent)] hover:underline"
-      >
-        @{ig}
-      </a>
+      {client.platform === "telegram" ? (
+        <p className="mt-1.5 text-[13px] text-[var(--muted)]">{subtitle}</p>
+      ) : (
+        <a
+          href={igUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+          className="mt-1.5 inline-flex w-fit text-[13px] text-[var(--muted)] underline-offset-2 transition-colors hover:text-[var(--accent)] hover:underline"
+        >
+          @{ig}
+        </a>
+      )}
 
       <dl className="mt-6 grid grid-cols-3 gap-3 border-t border-[var(--border)] pt-5">
         <div>

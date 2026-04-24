@@ -40,3 +40,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# загруженные медиа постов (локальный диск)
+/public/uploads/posts/**
+!/public/uploads/posts/.gitkeep

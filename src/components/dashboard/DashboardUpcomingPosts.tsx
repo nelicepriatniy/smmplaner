@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import type { ClientRecord, PostDraftRecord } from "@/domain/smm";
+import { clientSelectLabel, type ClientRecord, type PostDraftRecord } from "@/domain/smm";
 import { POST_TYPE_OPTIONS } from "@/types/postType";
 
 function scheduledAtIso(date: string, time: string) {
@@ -97,11 +97,7 @@ export function DashboardUpcomingPosts({
                     </div>
                     {client ? (
                       <p className="mt-0.5 truncate text-[14px] font-semibold text-[var(--foreground)]">
-                        {client.fullName}
-                        <span className="font-normal text-[var(--muted)]">
-                          {" "}
-                          @{client.instagramUsername}
-                        </span>
+                        {clientSelectLabel(client)}
                       </p>
                     ) : (
                       <p className="mt-0.5 text-[14px] text-[var(--muted)]">

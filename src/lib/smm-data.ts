@@ -9,6 +9,7 @@ import type {
 import { auth } from "@/auth";
 import type {
   ActivityKind,
+  ClientPlatform,
   ClientRecord,
   PostDraftRecord,
   PostDraftStatus,
@@ -89,6 +90,7 @@ function enrichClientRecord(
   return {
     id: c.id,
     fullName: c.fullName,
+    platform: c.platform as ClientPlatform,
     instagramUsername: c.instagramUsername,
     postsTotal,
     postsThisMonth,
@@ -98,6 +100,8 @@ function enrichClientRecord(
     instagramBusinessId: c.instagramBusinessId ?? undefined,
     facebookPageId: c.facebookPageId ?? undefined,
     businessAccountConfirmed: c.businessAccountConfirmed,
+    telegramChatId: c.telegramChatId ?? undefined,
+    hasTelegramBotToken: Boolean(c.telegramBotToken?.trim()),
   };
 }
 
@@ -199,11 +203,14 @@ export async function getClientRecordById(
   return {
     id: row.id,
     fullName: row.fullName,
+    platform: row.platform as ClientPlatform,
     instagramUsername: row.instagramUsername,
     postsTotal: 0,
     postsThisMonth: 0,
     postsPendingReview: 0,
     activitySpheres: spheresTuple(row.activitySpheres),
+    telegramChatId: row.telegramChatId ?? undefined,
+    hasTelegramBotToken: Boolean(row.telegramBotToken?.trim()),
   };
 }
 

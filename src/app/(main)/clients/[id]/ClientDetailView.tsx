@@ -120,17 +120,40 @@ export function ClientDetailView({
               </div>
               <div>
                 <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--muted)]">
-                  Instagram
+                  {client.platform === "telegram" ? "Telegram" : "Instagram"}
                 </dt>
                 <dd className="mt-0.5">
-                  <a
-                    href={igUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[14px] text-[var(--accent)] underline-offset-2 hover:underline"
-                  >
-                    @{ig}
-                  </a>
+                  {client.platform === "telegram" ? (
+                    <div className="space-y-3 text-[14px] text-[var(--foreground)]">
+                      <div>
+                        <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--muted)]">
+                          Токен бота
+                        </p>
+                        <p className="mt-0.5 text-[13px] text-[var(--foreground)]">
+                          {client.hasTelegramBotToken
+                            ? "Сохранён (не показывается)"
+                            : "Не задан"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--muted)]">
+                          ID чата
+                        </p>
+                        <p className="mt-0.5 break-all font-mono text-[13px]">
+                          {client.telegramChatId ?? "—"}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <a
+                      href={igUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[14px] text-[var(--accent)] underline-offset-2 hover:underline"
+                    >
+                      @{ig}
+                    </a>
+                  )}
                 </dd>
               </div>
               <div>

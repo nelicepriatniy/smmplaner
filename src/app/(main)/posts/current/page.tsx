@@ -7,6 +7,7 @@ import { PostClientReviewLink } from "@/components/posts/PostClientReviewLink";
 import { formatTimeAgoRuFrom } from "@/components/posts/postReviewUtils";
 import { PostsClientFilter } from "@/components/posts/PostsClientFilter";
 import {
+  clientSelectLabel,
   discussionAuthorLabel,
   getLastDiscussionComment,
   POST_DRAFT_STATUS_LABELS,
@@ -101,7 +102,7 @@ export default async function CurrentPostsPage({ searchParams }: PageProps) {
 
   const filterOptions = clients.map((c) => ({
     id: c.id,
-    label: `${c.fullName} (@${c.instagramUsername})`,
+    label: clientSelectLabel(c),
   }));
 
   return (

@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { PostType } from "@/types/postType";
-import type { ClientRecord } from "@/domain/smm";
+import { postPreviewAuthorUsername, type ClientRecord } from "@/domain/smm";
 
 type InstagramPostPreviewProps = {
   postType: PostType;
@@ -146,7 +146,7 @@ function InstagramFeedPostPreview({
 }: FeedProps) {
   const [slide, setSlide] = useState(0);
   const n = imageUrls.length;
-  const username = client?.instagramUsername ?? "client";
+  const username = postPreviewAuthorUsername(client);
 
   const fullCaption = useMemo(
     () => buildCaptionText(caption, username),
@@ -356,7 +356,7 @@ function ReelsOrStoriesFrame({
 }: VertProps) {
   const [slide, setSlide] = useState(0);
   const n = imageUrls.length;
-  const user = client?.instagramUsername ?? "client";
+  const user = postPreviewAuthorUsername(client);
   const hasImg = n > 0;
   const url = hasImg ? imageUrls[Math.min(slide, n - 1)]! : null;
   const cap = caption.trim();

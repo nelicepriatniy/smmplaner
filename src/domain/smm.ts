@@ -26,9 +26,12 @@ export function getLastDiscussionComment(
   return [...discussion].sort((a, b) => a.createdAt - b.createdAt).at(-1);
 }
 
+export type ClientPlatform = "instagram" | "telegram";
+
 export type ClientRecord = {
   id: string;
   fullName: string;
+  platform: ClientPlatform;
   instagramUsername: string;
   postsTotal: number;
   postsThisMonth: number;
@@ -39,7 +42,43 @@ export type ClientRecord = {
   instagramBusinessId?: string | null;
   facebookPageId?: string | null;
   businessAccountConfirmed?: boolean;
+  /** Только для platform === "telegram"; для списков/карточек. */
+  telegramChatId?: string | null;
+  /** В БД есть токен бота; сам токен в UI не передаётся. */
+  hasTelegramBotToken?: boolean;
 };
+
+/** Подпись клиента в селектах и фильтрах. */
+export function clientSelectLabel(client: ClientRecord): string {
+  if (client.platform === "telegram") {
+    const chat = client.telegramChatId?.trim();
+    return chat
+      ? `${client.fullName} (Telegram, чат ${chat})`
+      : `${client.fullName} (Telegram)`;
+  }
+  return `${client.fullName} (@${client.instagramUsername})`;
+}
+
+/** Короткая метка в ячейке календаря (без @). */
+export function clientCalendarShortHandle(
+  client: ClientRecord | undefined,
+  fallbackId: string
+): string {
+  if (!client) return fallbackId;
+  if (client.platform === "telegram") return client.telegramChatId?.trim() || "TG";
+  return client.instagramUsername;
+}
+
+/** Имя в превью поста (строка перед текстом подписи). */
+export function postPreviewAuthorUsername(client: ClientRecord | null): string {
+  if (!client) return "client";
+  if (client.platform === "telegram") {
+    const name = client.fullName.trim();
+    if (name.length <= 24) return name;
+    return `${name.slice(0, 21)}…`;
+  }
+  return client.instagramUsername;
+}
 
 export type PostDraftStatus =
   | "draft"
@@ -94,10 +133,18 @@ export function postDraftToEditorInitial(
   };
 }
 
-export function scheduledPublishMs(post: PostDraftRecord): number {
+/** Момент публикации по строкам даты/времени из редактора (календарь, Europe/Moscow). */
+export function publishScheduleInstantMs(
+  publishDate: string,
+  publishTime: string
+): number {
   const t =
-    post.publishTime.length === 5 ? `${post.publishTime}:00` : post.publishTime;
-  return Date.parse(`${post.publishDate}T${t}+03:00`);
+    publishTime.length === 5 ? `${publishTime}:00` : publishTime;
+  return Date.parse(`${publishDate}T${t}+03:00`);
+}
+
+export function scheduledPublishMs(post: PostDraftRecord): number {
+  return publishScheduleInstantMs(post.publishDate, post.publishTime);
 }
 
 export function countScheduledPostsInNextDays(
@@ -167,14 +214,28 @@ function ruAccountsHint(count: number): string {
 }
 
 /** Агрегаты дашборда по реальным постам и клиентам. */
-/** Месяц календаря по умолчанию: по последней дате публикации среди постов или текущий месяц. */
+/**
+ * Месяц календаря по умолчанию.
+ * Если в **текущем календарном месяце** есть хотя бы один пост — показываем этот месяц
+ * (чтобы пост «на сегодня» не терялся, когда в базе есть планы на более поздние месяцы).
+ * Иначе — месяц самой поздней `publishDate` среди постов; без постов — текущий месяц.
+ */
 export function calendarAnchorFromPosts(
   posts: PostDraftRecord[]
 ): { year: number; monthIndex: number } {
+  const d = new Date();
+  const nowYear = d.getFullYear();
+  const nowMonthIndex = d.getMonth();
   if (!posts.length) {
-    const d = new Date();
-    return { year: d.getFullYear(), monthIndex: d.getMonth() };
+    return { year: nowYear, monthIndex: nowMonthIndex };
   }
+
+  const yyyymm = `${nowYear}-${String(nowMonthIndex + 1).padStart(2, "0")}`;
+  const anyInThisCalendarMonth = posts.some((p) => p.publishDate.startsWith(yyyymm));
+  if (anyInThisCalendarMonth) {
+    return { year: nowYear, monthIndex: nowMonthIndex };
+  }
+
   let best = posts[0].publishDate;
   for (const p of posts) {
     if (p.publishDate > best) best = p.publishDate;
@@ -183,8 +244,7 @@ export function calendarAnchorFromPosts(
   const y = parts[0];
   const m = parts[1];
   if (!y || !m) {
-    const d = new Date();
-    return { year: d.getFullYear(), monthIndex: d.getMonth() };
+    return { year: nowYear, monthIndex: nowMonthIndex };
   }
   return { year: y, monthIndex: m - 1 };
 }
