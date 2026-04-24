@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { ClientRecord } from "@/domain/smm";
+import type { PostPublisherPreview } from "@/domain/smm";
 
 type TelegramPostPreviewProps = {
-  client: ClientRecord | null;
+  publisher: PostPublisherPreview | null;
   imageUrls: string[];
   caption: string;
 };
@@ -13,20 +13,20 @@ const tgFont =
   'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
 
 export function TelegramPostPreview({
-  client,
+  publisher,
   imageUrls,
   caption,
 }: TelegramPostPreviewProps) {
   const [slide, setSlide] = useState(0);
   const n = imageUrls.length;
-  const title = client?.fullName?.trim() || "Канал";
+  const title = publisher?.fullName?.trim() || "Канал";
   const subtitle =
-    client?.platform === "vk"
-      ? client.vkOwnerId?.trim()
-        ? `стена ${client.vkOwnerId.trim()}`
+    publisher?.platform === "vk"
+      ? publisher.vkOwnerId?.trim()
+        ? `стена ${publisher.vkOwnerId.trim()}`
         : "ВКонтакте"
-      : client?.telegramChatId?.trim()
-        ? `чат ${client.telegramChatId.trim()}`
+      : publisher?.telegramChatId?.trim()
+        ? `чат ${publisher.telegramChatId.trim()}`
         : "Telegram";
 
   const key = useMemo(() => imageUrls.join("\0"), [imageUrls]);

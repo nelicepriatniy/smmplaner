@@ -115,7 +115,7 @@ function ToastStack({
   if (!toasts.length) return null;
   return (
     <div
-      className="pointer-events-none fixed inset-x-0 top-0 z-[200] flex flex-col gap-2 px-4 pt-4 sm:pl-[calc(260px+1.25rem)] sm:pr-8"
+      className="pointer-events-none fixed inset-x-0 top-0 z-[200] flex flex-col gap-2 px-4 pt-4 sm:pl-[calc(var(--app-sidebar-width,260px)+1.25rem)] sm:pr-8"
       aria-live="polite"
     >
       {toasts.map((t) => (

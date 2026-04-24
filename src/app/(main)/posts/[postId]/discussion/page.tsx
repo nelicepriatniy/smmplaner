@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PostDiscussionThread } from "@/components/posts/PostDiscussionThread";
 import { getServerRefMs } from "@/lib/serverRefMs";
+import { socialAccountShortLabel } from "@/domain/smm";
 import {
   getPostForUser,
   listClientsForUser,
@@ -36,6 +37,7 @@ export default async function PostDiscussionPage({ params }: PageProps) {
   if (!post) notFound();
 
   const client = clients.find((c) => c.id === post.clientId);
+  const socialAcc = client?.socialAccounts.find((s) => s.id === post.socialAccountId);
 
   return (
     <main className="w-full max-w-2xl py-8 sm:py-10">
@@ -59,6 +61,11 @@ export default async function PostDiscussionPage({ params }: PageProps) {
               <span className="font-medium text-[var(--foreground)]">
                 {client.fullName}
               </span>
+              {socialAcc ? (
+                <span className="mt-1 block text-[13px] text-[var(--muted)]">
+                  {socialAccountShortLabel(socialAcc)}
+                </span>
+              ) : null}
             </>
           ) : (
             <>Пост {post.id}</>

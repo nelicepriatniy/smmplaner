@@ -28,68 +28,123 @@ export function getLastDiscussionComment(
 
 export type ClientPlatform = "instagram" | "telegram" | "vk";
 
+/** Подключённая соцсеть (учётка для публикации). */
+export type ClientSocialAccountRecord = {
+  id: string;
+  clientId: string;
+  platform: ClientPlatform;
+  instagramUsername: string;
+  instagramBusinessId?: string | null;
+  facebookPageId?: string | null;
+  businessAccountConfirmed?: boolean;
+  telegramChatId?: string | null;
+  hasTelegramBotToken?: boolean;
+  vkOwnerId?: string | null;
+  vkFromGroup?: boolean;
+  hasVkAccessToken?: boolean;
+};
+
 export type ClientRecord = {
   id: string;
   fullName: string;
-  platform: ClientPlatform;
-  instagramUsername: string;
+  socialAccounts: ClientSocialAccountRecord[];
   postsTotal: number;
   postsThisMonth: number;
   postsPendingReview: number;
   activitySpheres: [string] | [string, string];
-  /** Поля формы редактирования; токен страницы в клиент не передаём. */
   contact?: string | null;
-  instagramBusinessId?: string | null;
-  facebookPageId?: string | null;
-  businessAccountConfirmed?: boolean;
-  /** Только для platform === "telegram"; для списков/карточек. */
-  telegramChatId?: string | null;
-  /** В БД есть токен бота; сам токен в UI не передаётся. */
-  hasTelegramBotToken?: boolean;
-  /** owner_id для wall.post (отрицательный — группа). */
-  vkOwnerId?: string | null;
-  vkFromGroup?: boolean;
-  /** В БД сохранён токен ВК; сам токен в UI не передаётся. */
-  hasVkAccessToken?: boolean;
 };
 
-/** Подпись клиента в селектах и фильтрах. */
-export function clientSelectLabel(client: ClientRecord): string {
-  if (client.platform === "telegram") {
-    const chat = client.telegramChatId?.trim();
-    return chat
-      ? `${client.fullName} (Telegram, чат ${chat})`
-      : `${client.fullName} (Telegram)`;
+/** Метка аккаунта без имени клиента (селект «соцсеть»). */
+export function socialAccountShortLabel(account: ClientSocialAccountRecord): string {
+  if (account.platform === "telegram") {
+    const chat = account.telegramChatId?.trim();
+    return chat ? `Telegram · ${chat}` : "Telegram";
   }
-  if (client.platform === "vk") {
-    const wall = client.vkOwnerId?.trim();
-    return wall
-      ? `${client.fullName} (ВКонтакте, стена ${wall})`
-      : `${client.fullName} (ВКонтакте)`;
+  if (account.platform === "vk") {
+    const wall = account.vkOwnerId?.trim();
+    return wall ? `ВКонтакте · ${wall}` : "ВКонтакте";
   }
-  return `${client.fullName} (@${client.instagramUsername})`;
+  const ig = account.instagramUsername.trim();
+  return ig ? `Instagram · @${ig}` : "Instagram";
 }
 
-/** Короткая метка в ячейке календаря (без @). */
-export function clientCalendarShortHandle(
-  client: ClientRecord | undefined,
-  fallbackId: string
+/** Подпись в селектах: клиент + аккаунт. */
+export function clientSocialSelectLabel(
+  client: ClientRecord,
+  account: ClientSocialAccountRecord
 ): string {
-  if (!client) return fallbackId;
-  if (client.platform === "telegram") return client.telegramChatId?.trim() || "TG";
-  if (client.platform === "vk") return client.vkOwnerId?.trim() || "VK";
-  return client.instagramUsername;
+  return `${client.fullName} — ${socialAccountShortLabel(account)}`;
+}
+
+/** @deprecated Используйте clientSocialSelectLabel / socialAccountShortLabel */
+export function clientSelectLabel(client: ClientRecord): string {
+  const a = client.socialAccounts[0];
+  if (!a) return client.fullName;
+  return clientSocialSelectLabel(client, a);
+}
+
+/** Короткая метка в ячейке календаря для поста. */
+export function postCalendarShortHandle(
+  post: PostDraftRecord,
+  clients: ClientRecord[]
+): string {
+  const client = clients.find((c) => c.id === post.clientId);
+  const acc =
+    client?.socialAccounts.find((s) => s.id === post.socialAccountId) ??
+    client?.socialAccounts[0];
+  if (!acc) return post.clientId.slice(0, 8);
+  if (acc.platform === "telegram") return acc.telegramChatId?.trim() || "TG";
+  if (acc.platform === "vk") return acc.vkOwnerId?.trim() || "VK";
+  return acc.instagramUsername.trim() || "IG";
+}
+
+/** Данные для предпросмотра поста в редакторе / портале. */
+export type PostPublisherPreview = {
+  fullName: string;
+  platform: ClientPlatform;
+  instagramUsername: string;
+  telegramChatId?: string | null;
+  vkOwnerId?: string | null;
+};
+
+export function toPostPublisherPreview(
+  client: ClientRecord | null,
+  account: ClientSocialAccountRecord | null
+): PostPublisherPreview | null {
+  if (!client || !account) return null;
+  return {
+    fullName: client.fullName,
+    platform: account.platform,
+    instagramUsername: account.instagramUsername,
+    telegramChatId: account.telegramChatId,
+    vkOwnerId: account.vkOwnerId,
+  };
 }
 
 /** Имя в превью поста (строка перед текстом подписи). */
-export function postPreviewAuthorUsername(client: ClientRecord | null): string {
-  if (!client) return "client";
-  if (client.platform === "telegram" || client.platform === "vk") {
-    const name = client.fullName.trim();
+export function postPreviewAuthorUsername(preview: PostPublisherPreview | null): string {
+  if (!preview) return "client";
+  if (preview.platform === "telegram" || preview.platform === "vk") {
+    const name = preview.fullName.trim();
     if (name.length <= 24) return name;
     return `${name.slice(0, 21)}…`;
   }
-  return client.instagramUsername;
+  return preview.instagramUsername.trim() || preview.fullName;
+}
+
+/** Короткая метка в ячейке календаря (без @) — по клиенту и аккаунту. */
+export function clientCalendarShortHandle(
+  client: ClientRecord | undefined,
+  account: ClientSocialAccountRecord | undefined,
+  fallbackId: string
+): string {
+  if (!client) return fallbackId;
+  const acc = account ?? client.socialAccounts[0];
+  if (!acc) return fallbackId;
+  if (acc.platform === "telegram") return acc.telegramChatId?.trim() || "TG";
+  if (acc.platform === "vk") return acc.vkOwnerId?.trim() || "VK";
+  return acc.instagramUsername.trim() || "IG";
 }
 
 export type PostDraftStatus =
@@ -109,7 +164,11 @@ export const POST_DRAFT_STATUS_LABELS: Record<PostDraftStatus, string> = {
 
 export type PostDraftRecord = {
   id: string;
+  /** Владелец поста (клиент). */
   clientId: string;
+  /** Выбранная соцсеть публикации. */
+  socialAccountId: string;
+  socialAccount: ClientSocialAccountRecord;
   status: PostDraftStatus;
   postType: PostType;
   caption: string;
@@ -126,7 +185,7 @@ export type PostDraftRecord = {
 
 export type PostEditorInitialValues = Omit<
   PostDraftRecord,
-  "id" | "createdAt" | "status" | "discussion" | "clientReviewToken"
+  "id" | "createdAt" | "status" | "discussion" | "clientReviewToken" | "socialAccount"
 >;
 
 export function postDraftToEditorInitial(
@@ -134,6 +193,7 @@ export function postDraftToEditorInitial(
 ): PostEditorInitialValues {
   return {
     clientId: draft.clientId,
+    socialAccountId: draft.socialAccountId,
     postType: draft.postType,
     caption: draft.caption,
     location: draft.location,

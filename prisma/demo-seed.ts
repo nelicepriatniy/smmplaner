@@ -19,27 +19,37 @@ export async function seedDemoContentForUser(
     await tx.client.deleteMany({ where: { userId } });
 
     const clientIdByOld = new Map<string, string>();
+    const socialIdByOld = new Map<string, string>();
+
     for (const c of demoClientsFixture) {
       const created = await tx.client.create({
         data: {
           userId,
           fullName: c.fullName,
-          instagramUsername: c.instagramUsername,
           activitySpheres: [...c.activitySpheres],
         },
       });
       clientIdByOld.set(c.id, created.id);
+
+      const social = await tx.clientSocialAccount.create({
+        data: {
+          clientId: created.id,
+          platform: "instagram",
+          instagramUsername: c.instagramUsername,
+        },
+      });
+      socialIdByOld.set(c.id, social.id);
     }
 
     const postIdByOld = new Map<string, string>();
     for (const p of demoPostsFixture) {
-      const newClientId = clientIdByOld.get(p.clientId);
-      if (!newClientId) continue;
+      const newSocialId = socialIdByOld.get(p.clientId);
+      if (!newSocialId) continue;
 
       const created = await tx.post.create({
         data: {
           userId,
-          clientId: newClientId,
+          clientSocialAccountId: newSocialId,
           status: p.status,
           postType: p.postType,
           caption: p.caption,

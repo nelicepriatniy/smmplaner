@@ -35,15 +35,15 @@ export async function publishDueTelegramScheduledPosts(
   const rows = await prisma.post.findMany({
     where: {
       status: "scheduled",
-      client: { platform: "telegram" },
+      socialAccount: { platform: "telegram" },
     },
-    include: { client: true },
+    include: { socialAccount: true },
     orderBy: [{ publishDate: "asc" }, { publishTime: "asc" }],
   });
 
   const due = rows.filter((p) => {
-    const token = p.client.telegramBotToken?.trim();
-    const chat = p.client.telegramChatId?.trim();
+    const token = p.socialAccount.telegramBotToken?.trim();
+    const chat = p.socialAccount.telegramChatId?.trim();
     if (!token || !chat) return false;
     return publishScheduleInstantMs(p.publishDate, p.publishTime) <= nowMs;
   });
@@ -52,8 +52,8 @@ export async function publishDueTelegramScheduledPosts(
 
   for (const post of due) {
     summary.processed += 1;
-    const botToken = post.client.telegramBotToken?.trim();
-    const chatId = post.client.telegramChatId?.trim();
+    const botToken = post.socialAccount.telegramBotToken?.trim();
+    const chatId = post.socialAccount.telegramChatId?.trim();
     if (!botToken || !chatId) {
       summary.skipped += 1;
       continue;
@@ -83,6 +83,8 @@ export async function publishDueTelegramScheduledPosts(
       continue;
     }
 
+    const clientId = post.socialAccount.clientId;
+
     await prisma.activity.create({
       data: {
         userId: post.userId,
@@ -91,12 +93,12 @@ export async function publishDueTelegramScheduledPosts(
         title: "Пост опубликован в Telegram",
         detail: post.caption.trim().slice(0, 200) || undefined,
         postId: post.id,
-        clientId: post.clientId,
+        clientId,
       },
     });
 
     summary.published += 1;
-    revalidateClientIds.add(post.clientId);
+    revalidateClientIds.add(clientId);
   }
 
   if (summary.published > 0) {

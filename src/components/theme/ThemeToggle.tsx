@@ -1,5 +1,6 @@
 "use client";
 
+import { IconMoon, IconSun } from "@/components/icons/NavIcons";
 import { useState } from "react";
 
 export type Theme = "light" | "dark";
@@ -21,8 +22,46 @@ function applyTheme(theme: Theme) {
   }
 }
 
-export function ThemeToggle() {
+export function ThemeToggle({ compact = false }: { compact?: boolean }) {
   const [theme, setTheme] = useState<Theme>(readThemeFromDom);
+
+  if (compact) {
+    return (
+      <div
+        className="mb-3 flex flex-col gap-1 px-0.5"
+        role="group"
+        aria-label="Тема оформления"
+      >
+        {(
+          [
+            { id: "light" as const, label: "Светлая тема", Icon: IconSun },
+            { id: "dark" as const, label: "Тёмная тема", Icon: IconMoon },
+          ] as const
+        ).map(({ id, label, Icon }) => {
+          const active = theme === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => {
+                setTheme(id);
+                applyTheme(id);
+              }}
+              aria-label={label}
+              aria-pressed={active}
+              className={`flex h-10 w-full shrink-0 items-center justify-center rounded-lg transition-colors outline-offset-2 focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+                active
+                  ? "bg-[var(--accent-soft)] text-[var(--foreground)] ring-1 ring-[var(--border)]"
+                  : "text-[var(--muted)] hover:bg-[var(--surface-elevated)] hover:text-[var(--foreground)]"
+              }`}
+            >
+              <Icon className="size-5 shrink-0" />
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
     <div

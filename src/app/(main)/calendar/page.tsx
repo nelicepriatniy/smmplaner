@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { calendarAnchorFromPosts, clientSelectLabel } from "@/domain/smm";
+import {
+  parseClientIdsFromSearchParam,
+  parsePlatformsFromSearchParam,
+  parseStatusesFromSearchParam,
+} from "./calendarFilters";
 import { CalendarWithClientFilter } from "./CalendarWithClientFilter";
 import { getServerRefMs } from "@/lib/serverRefMs";
 import {
@@ -15,11 +20,18 @@ export const metadata: Metadata = {
 };
 
 type PageProps = {
-  searchParams: Promise<{ client?: string }>;
+  searchParams: Promise<{
+    client?: string;
+    platform?: string;
+    status?: string;
+  }>;
 };
 
 export default async function CalendarPage({ searchParams }: PageProps) {
-  const { client: clientParam } = await searchParams;
+  const sp = await searchParams;
+  const clientParam = sp.client;
+  const platformParam = sp.platform;
+  const statusParam = sp.status;
   const userId = await requireUserId();
   const refMs = await getServerRefMs();
   const [clients, allPosts] = await Promise.all([
@@ -27,14 +39,23 @@ export default async function CalendarPage({ searchParams }: PageProps) {
     listPostsForUser(userId),
   ]);
 
-  const filterClientId =
-    typeof clientParam === "string" && clients.some((c) => c.id === clientParam)
-      ? clientParam
-      : undefined;
+  const validClientIds = new Set(clients.map((c) => c.id));
+  const filterClientIds = parseClientIdsFromSearchParam(clientParam, validClientIds);
 
-  const displayPosts = allPosts.filter((p) =>
-    filterClientId ? p.clientId === filterClientId : true
+  const platformFilter = parsePlatformsFromSearchParam(platformParam);
+  const statusFilter = parseStatusesFromSearchParam(statusParam);
+
+  let displayPosts = allPosts.filter((p) =>
+    filterClientIds.length > 0 ? filterClientIds.includes(p.clientId) : true
   );
+  if (platformFilter.length > 0) {
+    displayPosts = displayPosts.filter((p) =>
+      platformFilter.includes(p.socialAccount.platform)
+    );
+  }
+  if (statusFilter.length > 0) {
+    displayPosts = displayPosts.filter((p) => statusFilter.includes(p.status));
+  }
 
   const filterOptions = clients.map((c) => ({
     id: c.id,
@@ -50,7 +71,7 @@ export default async function CalendarPage({ searchParams }: PageProps) {
           Календарь
         </h1>
         <p className="mt-1.5 text-[14px] text-[var(--muted)]">
-          Слоты по дням: запланированные, опубликованные и черновики.
+          Слоты по дням. Слева — фильтры, справа — сетка месяца.
         </p>
       </header>
 

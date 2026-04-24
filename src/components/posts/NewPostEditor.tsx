@@ -11,7 +11,9 @@ import {
   updatePostAction,
 } from "@/app/(main)/posts/actions";
 import {
-  clientSelectLabel,
+  clientSocialSelectLabel,
+  socialAccountShortLabel,
+  toPostPublisherPreview,
   type ClientPlatform,
   type ClientRecord,
   type PostDraftStatus,
@@ -34,62 +36,61 @@ import {
 
 type NewPostEditorProps = {
   clients: ClientRecord[];
-  /** Редактирование существующего поста (вместе с initialValues). */
   existingPostId?: string;
-  /** Статус поста при редактировании (кнопки «черновик» / «чистовик»). */
   existingPostStatus?: PostDraftStatus;
-  /** Если задано — форма открывается с данными черновика (страница редактирования). */
   initialValues?: PostEditorInitialValues | null;
-  /**
-   * Для новой записи: предвыбрать клиента (например `?client=` в URL).
-   * Не влияет, если задано `initialValues` (редактирование).
-   */
   initialClientId?: string;
-  /**
-   * Копия существующего поста: те же поля, но сценарий «новый» (расписание в URL уже нормализовано).
-   * Не задаёт `isEditMode`.
-   */
+  /** Предвыбор аккаунта соцсети (например из URL `?social=`). */
+  initialSocialAccountId?: string;
   duplicateFrom?: PostEditorInitialValues | null;
 };
 
-function clientsForPlatform(clients: ClientRecord[], platform: ClientPlatform) {
-  return clients.filter((c) => c.platform === platform);
+function clientsWithSocials(clients: ClientRecord[]) {
+  return clients.filter((c) => c.socialAccounts.length > 0);
 }
 
-function initChannelAndClient(
+function initClientAndSocial(
   clients: ClientRecord[],
   isEditMode: boolean,
   initialValues: PostEditorInitialValues | null,
   duplicateFrom: PostEditorInitialValues | null,
-  initialClientId: string | undefined
-): { publishPlatform: ClientPlatform; clientId: string } {
+  initialClientId: string | undefined,
+  initialSocialAccountId: string | undefined
+): { clientId: string; socialAccountId: string } {
+  const pickFirst = (): { clientId: string; socialAccountId: string } => {
+    const pool = clientsWithSocials(clients);
+    if (!pool.length) return { clientId: "", socialAccountId: "" };
+    const c = pool[0]!;
+    return { clientId: c.id, socialAccountId: c.socialAccounts[0]!.id };
+  };
+
   if (isEditMode && initialValues) {
-    const platform =
-      clients.find((c) => c.id === initialValues.clientId)?.platform ?? "instagram";
-    return { publishPlatform: platform, clientId: initialValues.clientId };
+    return {
+      clientId: initialValues.clientId,
+      socialAccountId: initialValues.socialAccountId,
+    };
   }
-  if (!clients.length) {
-    return { publishPlatform: "instagram", clientId: "" };
-  }
-  const fromSeed =
-    duplicateFrom?.clientId ??
-    initialValues?.clientId ??
-    (initialClientId && clients.some((c) => c.id === initialClientId)
-      ? initialClientId
-      : undefined);
-  if (fromSeed) {
-    const c = clients.find((x) => x.id === fromSeed);
-    if (c) {
-      return { publishPlatform: c.platform, clientId: c.id };
+  const seed = duplicateFrom ?? initialValues;
+  if (seed?.clientId && seed.socialAccountId) {
+    const c = clients.find((x) => x.id === seed.clientId);
+    if (c?.socialAccounts.some((s) => s.id === seed.socialAccountId)) {
+      return { clientId: seed.clientId, socialAccountId: seed.socialAccountId };
     }
   }
-  const ig = clientsForPlatform(clients, "instagram");
-  const tg = clientsForPlatform(clients, "telegram");
-  const vk = clientsForPlatform(clients, "vk");
-  if (ig.length) return { publishPlatform: "instagram", clientId: ig[0]!.id };
-  if (tg.length) return { publishPlatform: "telegram", clientId: tg[0]!.id };
-  if (vk.length) return { publishPlatform: "vk", clientId: vk[0]!.id };
-  return { publishPlatform: clients[0]!.platform, clientId: clients[0]!.id };
+  if (initialSocialAccountId) {
+    for (const c of clients) {
+      const sa = c.socialAccounts.find((s) => s.id === initialSocialAccountId);
+      if (sa) return { clientId: c.id, socialAccountId: sa.id };
+    }
+  }
+  if (
+    initialClientId &&
+    clients.some((c) => c.id === initialClientId && c.socialAccounts.length > 0)
+  ) {
+    const c = clients.find((x) => x.id === initialClientId)!;
+    return { clientId: c.id, socialAccountId: c.socialAccounts[0]!.id };
+  }
+  return pickFirst();
 }
 
 function seedForNew(
@@ -107,6 +108,7 @@ export function NewPostEditor({
   existingPostStatus,
   initialValues = null,
   initialClientId,
+  initialSocialAccountId,
   duplicateFrom = null,
 }: NewPostEditorProps) {
   const router = useRouter();
@@ -117,26 +119,20 @@ export function NewPostEditor({
   const [saveError, setSaveError] = useState("");
   const isEditMode = initialValues != null && Boolean(existingPostId);
   const seed = seedForNew(initialValues, duplicateFrom);
+  const publishedReadOnly = existingPostStatus === "published";
 
-  const [publishPlatform, setPublishPlatform] = useState<ClientPlatform>(() =>
-    initChannelAndClient(
-      clients,
-      isEditMode,
-      initialValues,
-      duplicateFrom,
-      initialClientId
-    ).publishPlatform
+  const init = initClientAndSocial(
+    clients,
+    isEditMode,
+    initialValues,
+    duplicateFrom,
+    initialClientId,
+    initialSocialAccountId
   );
-  const [clientId, setClientId] = useState(
-    () =>
-      initChannelAndClient(
-        clients,
-        isEditMode,
-        initialValues,
-        duplicateFrom,
-        initialClientId
-      ).clientId
-  );
+
+  const [clientId, setClientId] = useState(init.clientId);
+  const [socialAccountId, setSocialAccountId] = useState(init.socialAccountId);
+
   const [postType, setPostType] = useState<PostType>(
     () => seed?.postType ?? "feed"
   );
@@ -155,14 +151,12 @@ export function NewPostEditor({
       ? { date: seed.publishDate, time: seed.publishTime }
       : normalizePublishSchedule(getDefaultPublishSchedule())
   );
-  /** сбрасываем раз в минуту, чтобы `min` у даты/времени оставались валидны */
   const [scheduleTick, setScheduleTick] = useState(0);
   const scheduleId = useId();
   const minDateYmd = useMemo(
     () => getTodayYmdString(new Date()),
     [scheduleTick]
   );
-  /** При редактировании сохраняем прошлую дату публикации в допустимом диапазоне `min`. */
   const dateInputMin =
     initialValues?.publishDate && initialValues.publishDate < minDateYmd
       ? initialValues.publishDate
@@ -182,50 +176,51 @@ export function NewPostEditor({
     return () => clearInterval(id);
   }, [isEditMode]);
 
-  const client = useMemo(
+  const pool = useMemo(() => clientsWithSocials(clients), [clients]);
+
+  const selectedClient = useMemo(
     () => clients.find((c) => c.id === clientId) ?? null,
     [clients, clientId]
   );
 
-  const filteredClients = useMemo(
-    () => clientsForPlatform(clients, publishPlatform),
-    [clients, publishPlatform]
+  const socialOptions = selectedClient?.socialAccounts ?? [];
+
+  const selectedAccount = useMemo(
+    () => socialOptions.find((s) => s.id === socialAccountId) ?? null,
+    [socialOptions, socialAccountId]
   );
 
-  const hasIgClients = useMemo(
-    () => clients.some((c) => c.platform === "instagram"),
-    [clients]
-  );
-  const hasTgClients = useMemo(
-    () => clients.some((c) => c.platform === "telegram"),
-    [clients]
-  );
-  const hasVkClients = useMemo(
-    () => clients.some((c) => c.platform === "vk"),
-    [clients]
-  );
+  const publishPlatform: ClientPlatform = selectedAccount?.platform ?? "instagram";
 
-  const onPublishPlatform = useCallback(
-    (p: ClientPlatform) => {
-      if (isEditMode) return;
-      setPublishPlatform(p);
-      const pool = clientsForPlatform(clients, p);
-      setClientId((prev) => (pool.some((c) => c.id === prev) ? prev : pool[0]?.id ?? ""));
-      if (p === "telegram" || p === "vk") {
-        setPostType("feed");
-        setLocation("");
-        setFirstComment("");
-        setAltText("");
-      }
-    },
-    [clients, isEditMode]
+  const publisher = useMemo(
+    () => toPostPublisherPreview(selectedClient, selectedAccount),
+    [selectedClient, selectedAccount]
   );
 
   useEffect(() => {
-    if (filteredClients.some((c) => c.id === clientId)) return;
-    const next = filteredClients[0]?.id ?? "";
-    if (next !== clientId) setClientId(next);
-  }, [filteredClients, clientId]);
+    if (socialOptions.some((s) => s.id === socialAccountId)) return;
+    const next = socialOptions[0]?.id ?? "";
+    if (next !== socialAccountId) setSocialAccountId(next);
+  }, [socialOptions, socialAccountId]);
+
+  useEffect(() => {
+    if (pool.some((c) => c.id === clientId)) return;
+    const next = pool[0]?.id ?? "";
+    if (next !== clientId) {
+      setClientId(next);
+      const c = clients.find((x) => x.id === next);
+      setSocialAccountId(c?.socialAccounts[0]?.id ?? "");
+    }
+  }, [pool, clientId, clients]);
+
+  useEffect(() => {
+    if (publishPlatform === "telegram" || publishPlatform === "vk") {
+      setPostType("feed");
+      setLocation("");
+      setFirstComment("");
+      setAltText("");
+    }
+  }, [publishPlatform]);
 
   const typeHint = useMemo(
     () => POST_TYPE_OPTIONS.find((o) => o.value === postType),
@@ -279,7 +274,7 @@ export function NewPostEditor({
     const isTgOrVk =
       publishPlatform === "telegram" || publishPlatform === "vk";
     return {
-      clientId,
+      socialAccountId,
       postType: isTgOrVk ? ("feed" as PostType) : postType,
       caption,
       location: isTgOrVk ? "" : location,
@@ -290,7 +285,7 @@ export function NewPostEditor({
       publishTime: publishSchedule.time,
     };
   }, [
-    clientId,
+    socialAccountId,
     postType,
     caption,
     location,
@@ -302,10 +297,13 @@ export function NewPostEditor({
     publishPlatform,
   ]);
 
+  const ro = publishedReadOnly;
+
   const savePost = useCallback(() => {
+    if (ro) return;
     setSaveError("");
-    if (!clientId || !filteredClients.some((c) => c.id === clientId)) {
-      setSaveError("Выберите клиента для выбранной платформы.");
+    if (!clientId || !socialAccountId || !selectedAccount) {
+      setSaveError("Выберите клиента и соцсеть.");
       return;
     }
     startSaveTransition(async () => {
@@ -332,16 +330,19 @@ export function NewPostEditor({
     buildPayload,
     clientId,
     existingPostId,
-    filteredClients,
     isEditMode,
+    ro,
     router,
+    selectedAccount,
+    socialAccountId,
     startSaveTransition,
   ]);
 
   const saveNewPostAsScheduled = useCallback(() => {
+    if (ro) return;
     setSaveError("");
-    if (!clientId || !filteredClients.some((c) => c.id === clientId)) {
-      setSaveError("Выберите клиента для выбранной платформы.");
+    if (!clientId || !socialAccountId || !selectedAccount) {
+      setSaveError("Выберите клиента и соцсеть.");
       return;
     }
     startSaveTransition(async () => {
@@ -354,11 +355,11 @@ export function NewPostEditor({
         router.push(`/posts/${res.postId}/edit`);
       }
     });
-  }, [buildPayload, clientId, filteredClients, router, startSaveTransition]);
+  }, [buildPayload, clientId, ro, router, selectedAccount, socialAccountId, startSaveTransition]);
 
   const setPostLifecycle = useCallback(
     (target: "draft" | "scheduled") => {
-      if (!existingPostId) return;
+      if (!existingPostId || ro) return;
       setSaveError("");
       startSaveTransition(async () => {
         const res = await setPostDraftOrScheduledAction(existingPostId, target);
@@ -369,11 +370,11 @@ export function NewPostEditor({
         router.refresh();
       });
     },
-    [existingPostId, router, startSaveTransition]
+    [existingPostId, ro, router, startSaveTransition]
   );
 
   const removePost = useCallback(() => {
-    if (!existingPostId) return;
+    if (!existingPostId || ro) return;
     void (async () => {
       const ok = await confirm({
         message: "Удалить этот пост? Действие необратимо.",
@@ -393,13 +394,13 @@ export function NewPostEditor({
         router.refresh();
       });
     })();
-  }, [confirm, existingPostId, router, startDeleteTransition, toast]);
+  }, [confirm, existingPostId, ro, router, startDeleteTransition, toast]);
 
   const publishNow = useCallback(() => {
-    if (!existingPostId) return;
+    if (!existingPostId || ro) return;
     void (async () => {
-      const isTg = client?.platform === "telegram";
-      const isVk = client?.platform === "vk";
+      const isTg = selectedAccount?.platform === "telegram";
+      const isVk = selectedAccount?.platform === "vk";
       const ok = await confirm({
         message: isVk
           ? "Опубликовать запись на стене ВКонтакте сейчас? В базе пост будет отмечен как опубликованный."
@@ -427,19 +428,31 @@ export function NewPostEditor({
         router.refresh();
       });
     })();
-  }, [buildPayload, client?.platform, confirm, existingPostId, router, startPublishTransition, toast]);
+  }, [
+    buildPayload,
+    confirm,
+    existingPostId,
+    ro,
+    router,
+    selectedAccount?.platform,
+    startPublishTransition,
+    toast,
+  ]);
 
   const canPublishNowInstant =
     isEditMode &&
-    (client?.platform === "telegram" || client?.platform === "vk") &&
-    existingPostStatus !== "published" &&
+    !ro &&
+    (selectedAccount?.platform === "telegram" ||
+      selectedAccount?.platform === "vk") &&
     existingPostStatus !== "rejected";
 
   const canSave =
-    filteredClients.length > 0 &&
+    pool.length > 0 &&
     Boolean(clientId) &&
-    filteredClients.some((c) => c.id === clientId) &&
-    imageUploadState === "idle";
+    Boolean(socialAccountId) &&
+    Boolean(selectedAccount) &&
+    imageUploadState === "idle" &&
+    !ro;
 
   const publishBusy = isSaving || isDeleting || isPublishing;
 
@@ -453,100 +466,81 @@ export function NewPostEditor({
           Материалы
         </h2>
 
-        <div className="mt-5 space-y-5">
-          <div role="radiogroup" aria-label="Платформа публикации">
-            <span className="text-[14px] font-medium text-[var(--foreground)]">
-              Платформа
-            </span>
-            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
-              <button
-                type="button"
-                disabled={isEditMode || !hasIgClients}
-                className={`rounded-xl border px-3 py-2.5 text-[14px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-40 ${
-                  publishPlatform === "instagram"
-                    ? "border-[color-mix(in_srgb,var(--accent)_45%,var(--border))] bg-[var(--surface-elevated)] text-[var(--foreground)]"
-                    : "border-[var(--border)] bg-[var(--background)] text-[var(--muted)] hover:text-[var(--foreground)]"
-                }`}
-                aria-checked={publishPlatform === "instagram"}
-                role="radio"
-                onClick={() => onPublishPlatform("instagram")}
-              >
-                Instagram
-              </button>
-              <button
-                type="button"
-                disabled={isEditMode || !hasTgClients}
-                className={`rounded-xl border px-3 py-2.5 text-[14px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-40 ${
-                  publishPlatform === "telegram"
-                    ? "border-[color-mix(in_srgb,var(--accent)_45%,var(--border))] bg-[var(--surface-elevated)] text-[var(--foreground)]"
-                    : "border-[var(--border)] bg-[var(--background)] text-[var(--muted)] hover:text-[var(--foreground)]"
-                }`}
-                aria-checked={publishPlatform === "telegram"}
-                role="radio"
-                onClick={() => onPublishPlatform("telegram")}
-              >
-                Telegram
-              </button>
-              <button
-                type="button"
-                disabled={isEditMode || !hasVkClients}
-                className={`rounded-xl border px-3 py-2.5 text-[14px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-40 ${
-                  publishPlatform === "vk"
-                    ? "border-[color-mix(in_srgb,var(--accent)_45%,var(--border))] bg-[var(--surface-elevated)] text-[var(--foreground)]"
-                    : "border-[var(--border)] bg-[var(--background)] text-[var(--muted)] hover:text-[var(--foreground)]"
-                }`}
-                aria-checked={publishPlatform === "vk"}
-                role="radio"
-                onClick={() => onPublishPlatform("vk")}
-              >
-                ВКонтакте
-              </button>
-            </div>
-            {!(hasIgClients && hasTgClients && hasVkClients) ? (
-              <p className="mt-2 text-[12px] text-[var(--muted)]">
-                {!hasIgClients && !hasTgClients && !hasVkClients
-                  ? "Добавьте клиента в разделе «Клиенты»."
-                  : `Нет клиентов для: ${[
-                      !hasIgClients ? "Instagram" : null,
-                      !hasTgClients ? "Telegram" : null,
-                      !hasVkClients ? "ВКонтакте" : null,
-                    ]
-                      .filter(Boolean)
-                      .join(", ")} — добавьте в «Клиенты» или выберите доступную платформу.`}
-              </p>
-            ) : null}
-            {isEditMode ? (
-              <p className="mt-2 text-[12px] text-[var(--muted)]">
-                Платформа совпадает с клиентом поста и не меняется при редактировании.
-              </p>
-            ) : null}
-          </div>
+        {publishedReadOnly ? (
+          <p className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] px-4 py-3 text-[14px] text-[var(--foreground)]">
+            Пост уже опубликован — поля и действия недоступны для изменения.
+          </p>
+        ) : null}
 
-          <div>
-            <label
-              htmlFor="post-client"
-              className="text-[14px] font-medium text-[var(--foreground)]"
-            >
-              Клиент
-            </label>
-            <select
-              id="post-client"
-              className="mt-2 w-full"
-              value={clientId}
-              disabled={filteredClients.length === 0}
-              onChange={(e) => setClientId(e.target.value)}
-            >
-              {filteredClients.length === 0 ? (
-                <option value="">Нет клиентов для этой платформы</option>
-              ) : (
-                filteredClients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {clientSelectLabel(c)}
-                  </option>
-                ))
-              )}
-            </select>
-          </div>
+        <div className="mt-5 space-y-5">
+          {!pool.length ? (
+            <p className="text-[14px] text-[var(--muted)]">
+              Нет клиентов с подключёнными соцсетями. Добавьте клиента и хотя бы одну соцсеть в
+              разделе «Клиенты».
+            </p>
+          ) : (
+            <>
+              <p className="text-[13px] text-[var(--muted)]">
+                Платформа и предпросмотр определяются выбранной соцсетью.
+                {isEditMode ? " Клиент и соцсеть поста не меняются." : null}
+              </p>
+
+              <div>
+                <label
+                  htmlFor="post-client"
+                  className="text-[14px] font-medium text-[var(--foreground)]"
+                >
+                  Клиент
+                </label>
+                <select
+                  id="post-client"
+                  className="mt-2 w-full"
+                  value={clientId}
+                  disabled={ro || pool.length === 0 || isEditMode}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setClientId(id);
+                    const c = clients.find((x) => x.id === id);
+                    setSocialAccountId(c?.socialAccounts[0]?.id ?? "");
+                  }}
+                >
+                  {pool.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.fullName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="post-social"
+                  className="text-[14px] font-medium text-[var(--foreground)]"
+                >
+                  Соцсеть
+                </label>
+                <select
+                  id="post-social"
+                  className="mt-2 w-full"
+                  value={socialAccountId}
+                  disabled={ro || !socialOptions.length || isEditMode}
+                  onChange={(e) => setSocialAccountId(e.target.value)}
+                >
+                  {socialOptions.length === 0 ? (
+                    <option value="">Нет подключённых сетей</option>
+                  ) : (
+                    socialOptions.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {selectedClient
+                          ? clientSocialSelectLabel(selectedClient, s)
+                          : socialAccountShortLabel(s)}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+            </>
+          )}
 
           {publishPlatform === "instagram" ? (
             <div>
@@ -563,6 +557,7 @@ export function NewPostEditor({
                 id="post-type"
                 className="mt-2 w-full"
                 value={postType}
+                disabled={ro}
                 onChange={(e) => setPostType(e.target.value as PostType)}
               >
                 {POST_TYPE_OPTIONS.map((o) => (
@@ -596,7 +591,7 @@ export function NewPostEditor({
                 type="file"
                 accept="image/*"
                 multiple
-                disabled={imageUploadState === "uploading"}
+                disabled={ro || imageUploadState === "uploading"}
                 className="w-full min-w-0 text-[14px] text-[var(--muted)] file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-[var(--surface-elevated)] file:px-3.5 file:py-2 file:text-[14px] file:font-medium file:text-[var(--foreground)] hover:file:bg-[var(--border)] disabled:cursor-not-allowed disabled:opacity-50"
                 onChange={async (e) => {
                   await setImagesFromFiles(e.target.files);
@@ -606,7 +601,7 @@ export function NewPostEditor({
               {imageUploadState === "uploading" ? (
                 <span className="text-[13px] text-[var(--muted)]">Загрузка на сервер…</span>
               ) : null}
-              {imageUrls.length > 0 && imageUploadState === "idle" ? (
+              {imageUrls.length > 0 && imageUploadState === "idle" && !ro ? (
                 <button
                   type="button"
                   onClick={clearImages}
@@ -629,7 +624,8 @@ export function NewPostEditor({
               id="post-caption"
               rows={5}
               placeholder="Текст, #хэштеги, @упоминания"
-              className="mt-2 w-full resize-y rounded-xl border border-[var(--border)] bg-[var(--background)] px-3.5 py-2.5 text-[15px] text-[var(--foreground)] placeholder:text-[var(--muted)] outline-offset-2 focus:border-[color-mix(in_srgb,var(--accent)_50%,var(--border))] focus:ring-2 focus:ring-[var(--accent-soft)]"
+              readOnly={ro}
+              className="mt-2 w-full resize-y rounded-xl border border-[var(--border)] bg-[var(--background)] px-3.5 py-2.5 text-[15px] text-[var(--foreground)] placeholder:text-[var(--muted)] outline-offset-2 focus:border-[color-mix(in_srgb,var(--accent)_50%,var(--border))] focus:ring-2 focus:ring-[var(--accent-soft)] read-only:cursor-default read-only:opacity-80"
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
             />
@@ -648,13 +644,14 @@ export function NewPostEditor({
                   id="post-location"
                   type="text"
                   autoComplete="off"
+                  readOnly={ro}
                   disabled={!isFeedLikePostType(postType)}
                   placeholder={
                     isFeedLikePostType(postType)
                       ? "Показано под ником в шапке поста"
                       : "Для рилс/сторис не в шапке (в рилс — подпись снизу, в сторис — текст в кадре)"
                   }
-                  className="mt-2 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3.5 py-2.5 text-[15px] text-[var(--foreground)] placeholder:text-[var(--muted)] outline-offset-2 focus:border-[color-mix(in_srgb,var(--accent)_50%,var(--border))] focus:ring-2 focus:ring-[var(--accent-soft)] disabled:cursor-not-allowed disabled:opacity-45"
+                  className="mt-2 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3.5 py-2.5 text-[15px] text-[var(--foreground)] placeholder:text-[var(--muted)] outline-offset-2 focus:border-[color-mix(in_srgb,var(--accent)_50%,var(--border))] focus:ring-2 focus:ring-[var(--accent-soft)] disabled:cursor-not-allowed disabled:opacity-45 read-only:cursor-default read-only:opacity-80"
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
                 />
@@ -673,7 +670,8 @@ export function NewPostEditor({
                 <textarea
                   id="post-first-comment"
                   rows={3}
-                  className="mt-2 w-full resize-y rounded-xl border border-[var(--border)] bg-[var(--background)] px-3.5 py-2.5 text-[15px] text-[var(--foreground)] placeholder:text-[var(--muted)] outline-offset-2 focus:border-[color-mix(in_srgb,var(--accent)_50%,var(--border))] focus:ring-2 focus:ring-[var(--accent-soft)]"
+                  readOnly={ro}
+                  className="mt-2 w-full resize-y rounded-xl border border-[var(--border)] bg-[var(--background)] px-3.5 py-2.5 text-[15px] text-[var(--foreground)] placeholder:text-[var(--muted)] outline-offset-2 focus:border-[color-mix(in_srgb,var(--accent)_50%,var(--border))] focus:ring-2 focus:ring-[var(--accent-soft)] read-only:cursor-default read-only:opacity-80"
                   value={firstComment}
                   onChange={(e) => setFirstComment(e.target.value)}
                 />
@@ -692,7 +690,8 @@ export function NewPostEditor({
                 <input
                   id="post-alt"
                   type="text"
-                  className="mt-2 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3.5 py-2.5 text-[15px] text-[var(--foreground)] placeholder:text-[var(--muted)] outline-offset-2 focus:border-[color-mix(in_srgb,var(--accent)_50%,var(--border))] focus:ring-2 focus:ring-[var(--accent-soft)]"
+                  readOnly={ro}
+                  className="mt-2 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3.5 py-2.5 text-[15px] text-[var(--foreground)] placeholder:text-[var(--muted)] outline-offset-2 focus:border-[color-mix(in_srgb,var(--accent)_50%,var(--border))] focus:ring-2 focus:ring-[var(--accent-soft)] read-only:cursor-default read-only:opacity-80"
                   value={altText}
                   onChange={(e) => setAltText(e.target.value)}
                 />
@@ -717,7 +716,7 @@ export function NewPostEditor({
         </p>
 
         <div className="mt-8 flex flex-row flex-wrap items-center gap-3">
-          {isEditMode ? (
+          {isEditMode && !publishedReadOnly ? (
             <>
               <button
                 type="button"
@@ -765,7 +764,7 @@ export function NewPostEditor({
                 {isDeleting ? "Удаление…" : "Удалить"}
               </button>
             </>
-          ) : (
+          ) : !isEditMode ? (
             <>
               <button
                 type="button"
@@ -784,7 +783,7 @@ export function NewPostEditor({
                 {isSaving ? "Сохранение…" : "Сохранить в черновики"}
               </button>
             </>
-          )}
+          ) : null}
         </div>
       </section>
 
@@ -820,14 +819,14 @@ export function NewPostEditor({
         >
           {publishPlatform === "telegram" || publishPlatform === "vk" ? (
             <TelegramPostPreview
-              client={client}
+              publisher={publisher}
               imageUrls={imageUrls}
               caption={caption}
             />
           ) : (
             <InstagramPostPreview
               postType={postType}
-              client={client}
+              publisher={publisher}
               imageUrls={imageUrls}
               caption={caption}
               location={location}
@@ -862,8 +861,9 @@ export function NewPostEditor({
               <input
                 id={`${scheduleId}-date`}
                 type="date"
+                readOnly={ro}
                 min={dateInputMin}
-                className="mt-1.5 w-full min-w-0 rounded-xl border border-[var(--border)] bg-[var(--background)] px-3.5 py-2.5 text-[15px] text-[var(--foreground)] [color-scheme:light] dark:[color-scheme:dark] outline-offset-2 focus:border-[color-mix(in_srgb,var(--accent)_50%,var(--border))] focus:ring-2 focus:ring-[var(--accent-soft)]"
+                className="mt-1.5 w-full min-w-0 rounded-xl border border-[var(--border)] bg-[var(--background)] px-3.5 py-2.5 text-[15px] text-[var(--foreground)] [color-scheme:light] dark:[color-scheme:dark] outline-offset-2 focus:border-[color-mix(in_srgb,var(--accent)_50%,var(--border))] focus:ring-2 focus:ring-[var(--accent-soft)] read-only:cursor-default read-only:opacity-80"
                 value={publishSchedule.date}
                 onChange={(e) => {
                   const d = e.target.value;
@@ -883,8 +883,9 @@ export function NewPostEditor({
               <input
                 id={`${scheduleId}-time`}
                 type="time"
+                readOnly={ro}
                 min={minTime}
-                className="mt-1.5 w-full min-w-0 rounded-xl border border-[var(--border)] bg-[var(--background)] px-3.5 py-2.5 text-[15px] text-[var(--foreground)] [color-scheme:light] dark:[color-scheme:dark] outline-offset-2 focus:border-[color-mix(in_srgb,var(--accent)_50%,var(--border))] focus:ring-2 focus:ring-[var(--accent-soft)]"
+                className="mt-1.5 w-full min-w-0 rounded-xl border border-[var(--border)] bg-[var(--background)] px-3.5 py-2.5 text-[15px] text-[var(--foreground)] [color-scheme:light] dark:[color-scheme:dark] outline-offset-2 focus:border-[color-mix(in_srgb,var(--accent)_50%,var(--border))] focus:ring-2 focus:ring-[var(--accent-soft)] read-only:cursor-default read-only:opacity-80"
                 value={publishSchedule.time}
                 onChange={(e) => {
                   const t = e.target.value;

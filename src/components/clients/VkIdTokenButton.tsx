@@ -2,8 +2,21 @@
 
 import { useEffect, useRef, useState } from "react";
 
-/** Права для api.vk.com: стена, фото, сообщества (для поста от имени группы), долгоживущий токен. */
-const DEFAULT_SCOPE = "wall,photos,groups,offline";
+/**
+ * Права для api.vk.com (стена, фото, сообщества, offline) + базовый профиль VK ID.
+ * В спецификации VK ID scope — список через пробелы (не запятую): см. запрос authorize / oauth2.
+ */
+const DEFAULT_SCOPE =
+  "vkid.personal_info wall photos groups offline";
+
+/** VK ID ожидает scope как в OAuth: значения через пробел. Запятые из .env приводим к пробелам. */
+function normalizeVkidScope(raw: string): string {
+  return raw
+    .trim()
+    .replace(/,/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
 /** Как в @vkid/sdk `getCookie` — читаем PKCE после LOGIN_SUCCESS. */
 function readVkidSdkCookie(name: string): string | undefined {
@@ -143,7 +156,9 @@ export function VkIdTokenButton({ onAccessToken, disabled }: VkIdTokenButtonProp
         const mount = () => {
           if (cancelled || !containerRef.current) return false;
 
-          const scope = process.env.NEXT_PUBLIC_VK_SCOPE?.trim() || DEFAULT_SCOPE;
+          const scope = normalizeVkidScope(
+            process.env.NEXT_PUBLIC_VK_SCOPE?.trim() || DEFAULT_SCOPE,
+          );
           const host =
             typeof window !== "undefined" ? window.location.hostname : "";
           const localhost =

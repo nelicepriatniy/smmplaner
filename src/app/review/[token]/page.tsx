@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ClientReviewPanel } from "@/components/posts/ClientReviewPanel";
 import { getServerRefMs } from "@/lib/serverRefMs";
+import { toPostPublisherPreview } from "@/domain/smm";
 import {
   getClientRecordById,
   getPostByClientReviewToken,
@@ -28,6 +29,7 @@ export default async function ClientReviewPage({ params }: PageProps) {
   if (!post) notFound();
 
   const client = await getClientRecordById(post.clientId);
+  const publisher = toPostPublisherPreview(client, post.socialAccount);
   const refMs = await getServerRefMs();
   const reviewToken = decodeURIComponent(token).trim();
 
@@ -52,7 +54,7 @@ export default async function ClientReviewPage({ params }: PageProps) {
         <ClientReviewPanel
           clientReviewToken={reviewToken}
           postType={post.postType}
-          client={client}
+          publisher={publisher}
           imageUrls={post.imageUrls}
           caption={post.caption}
           location={post.location}

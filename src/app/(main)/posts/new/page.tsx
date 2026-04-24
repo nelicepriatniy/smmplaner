@@ -21,7 +21,7 @@ export const metadata: Metadata = {
 };
 
 type PageProps = {
-  searchParams: Promise<{ client?: string; duplicateFrom?: string }>;
+  searchParams: Promise<{ client?: string; social?: string; duplicateFrom?: string }>;
 };
 
 function validClientId(
@@ -32,6 +32,17 @@ function validClientId(
     return undefined;
   }
   return param;
+}
+
+function validSocialAccountId(
+  clients: { id: string; socialAccounts: { id: string }[] }[],
+  param: string | undefined
+): string | undefined {
+  if (typeof param !== "string") return undefined;
+  for (const c of clients) {
+    if (c.socialAccounts.some((s) => s.id === param)) return param;
+  }
+  return undefined;
 }
 
 function toDuplicateFormValues(
@@ -50,8 +61,11 @@ export default async function NewPostPage({ searchParams }: PageProps) {
   const userId = await requireUserId();
   const refMs = await getServerRefMs();
   const clients = await listClientsForUser(userId, refMs);
-  const { client: clientParam, duplicateFrom: duplicateFromId } =
-    await searchParams;
+  const {
+    client: clientParam,
+    social: socialParam,
+    duplicateFrom: duplicateFromId,
+  } = await searchParams;
 
   const duplicateFrom: PostEditorInitialValues | null =
     typeof duplicateFromId === "string"
@@ -60,6 +74,10 @@ export default async function NewPostPage({ searchParams }: PageProps) {
 
   const initialClientId =
     duplicateFrom != null ? undefined : validClientId(clients, clientParam);
+  const initialSocialAccountId =
+    duplicateFrom != null
+      ? undefined
+      : validSocialAccountId(clients, socialParam);
 
   const editorKey = duplicateFrom
     ? `dup-${duplicateFromId}`
@@ -84,6 +102,7 @@ export default async function NewPostPage({ searchParams }: PageProps) {
         key={editorKey}
         clients={clients}
         initialClientId={initialClientId}
+        initialSocialAccountId={initialSocialAccountId}
         duplicateFrom={duplicateFrom}
       />
     </main>

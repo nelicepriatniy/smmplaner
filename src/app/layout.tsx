@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Script from "next/script";
 import { AuthSessionProvider } from "@/components/auth/SessionProvider";
 import { AppNotificationsProvider } from "@/components/notifications/AppNotifications";
 import "./globals.css";
@@ -22,12 +21,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ru" data-theme="dark" suppressHydrationWarning>
-      <body className="antialiased">
-        <Script
-          id="smmplaner-theme-init"
-          strategy="beforeInteractive"
+      <head>
+        {/* Inline в head: выполняется до paint, без next/script (React 19 не ренерит inline Script в body). */}
+        <script
+          // eslint-disable-next-line react/no-danger -- синхронная инициализация темы из localStorage
           dangerouslySetInnerHTML={{ __html: themeInitScript }}
         />
+      </head>
+      <body className="antialiased">
         <AuthSessionProvider>
           <AppNotificationsProvider>{children}</AppNotificationsProvider>
         </AuthSessionProvider>

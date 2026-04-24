@@ -1,5 +1,6 @@
 @import url("https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap");
-@import "tailwindcss";
+/* Только `src/`: не подхватывать классы из родителя проекта при неверном корне сборки. */
+@import "tailwindcss" source("..");
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
@@ -8,6 +9,8 @@
 }
 
 html {
+  /* Смещение тостов и др.; обновляется из MainAppShell при сворачивании сайдбара */
+  --app-sidebar-width: 260px;
   --background: #12141a;
   --foreground: #e9e6f0;
   --muted: #8c8898;

@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
-import { AppSidebar } from "@/components/sidebar/AppSidebar";
+import { MainAppShell } from "@/components/sidebar/MainAppShell";
 
 export default async function MainAppLayout({
   children,
@@ -13,17 +13,14 @@ export default async function MainAppLayout({
   }
 
   return (
-    <div className="min-h-dvh">
-      <AppSidebar
-        user={{
-          email: session.user.email ?? null,
-          name: session.user.name,
-          image: session.user.image,
-        }}
-      />
-      <div className="box-border ml-[260px] flex min-h-dvh min-w-0 w-[calc(100%-260px)] flex-col px-5 sm:px-8 lg:px-10">
-        {children}
-      </div>
-    </div>
+    <MainAppShell
+      user={{
+        email: session.user.email ?? null,
+        name: session.user.name,
+        image: session.user.image,
+      }}
+    >
+      {children}
+    </MainAppShell>
   );
 }

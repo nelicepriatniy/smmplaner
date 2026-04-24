@@ -4,6 +4,20 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogoMark } from "@/components/header/LogoMark";
+import {
+  IconCalendar,
+  IconChevronLeft,
+  IconChevronRight,
+  IconDashboard,
+  IconNewPost,
+  IconPosts,
+  IconUsers,
+} from "@/components/icons/NavIcons";
+import type { ReactNode } from "react";
+import {
+  SIDEBAR_COLLAPSED_PX,
+  SIDEBAR_EXPANDED_PX,
+} from "@/components/sidebar/sidebar-width";
 
 const ThemeToggle = dynamic(
   () =>
@@ -22,35 +36,52 @@ const ThemeToggle = dynamic(
 );
 
 const mainNav = [
-  { href: "/", label: "Дашборд" },
-  { href: "/clients", label: "Клиенты" },
-  { href: "/calendar", label: "Календарь" },
+  { href: "/", label: "Дашборд", Icon: IconDashboard },
+  { href: "/clients", label: "Клиенты", Icon: IconUsers },
+  { href: "/calendar", label: "Календарь", Icon: IconCalendar },
 ] as const;
 
 const contentNav = [
-  { href: "/posts/current", label: "Актуальные посты" },
-  { href: "/posts/new", label: "Новый пост" },
+  { href: "/posts/current", label: "Актуальные посты", Icon: IconPosts },
+  { href: "/posts/new", label: "Новый пост", Icon: IconNewPost },
 ] as const;
 
 function NavItem({
   href,
   active,
+  icon,
+  collapsed,
   children,
 }: {
   href: string;
   active: boolean;
+  collapsed: boolean;
+  icon?: ReactNode;
   children: React.ReactNode;
 }) {
+  const labelText = typeof children === "string" ? children : undefined;
   return (
     <Link
       href={href}
-      className={`rounded-lg px-3 py-2 text-[14px] font-medium transition-colors outline-offset-2 focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+      title={collapsed && labelText ? labelText : undefined}
+      className={`flex items-center rounded-lg text-[14px] font-medium outline-offset-2 transition-[padding,gap] duration-300 ease-out focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+        collapsed ? "justify-center gap-0 px-2 py-2.5" : "gap-2.5 px-3 py-2"
+      } ${
         active
           ? "bg-[var(--accent-soft)] text-[var(--foreground)]"
           : "text-[var(--muted)] hover:bg-[var(--surface-elevated)] hover:text-[var(--foreground)]"
       }`}
     >
-      {children}
+      {icon ? <span className="shrink-0 opacity-90">{icon}</span> : null}
+      <span
+        className={
+          collapsed
+            ? "sr-only"
+            : "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap leading-snug"
+        }
+      >
+        {children}
+      </span>
     </Link>
   );
 }
@@ -60,8 +91,13 @@ function isNavActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function Divider() {
-  return <div className="my-4 h-px bg-[var(--border)]" aria-hidden />;
+function Divider({ collapsed }: { collapsed: boolean }) {
+  return (
+    <div
+      className={`bg-[var(--border)] ${collapsed ? "mx-0 my-3 h-px" : "my-4 h-px"}`}
+      aria-hidden
+    />
+  );
 }
 
 export type AppSidebarUser = {
@@ -70,7 +106,15 @@ export type AppSidebarUser = {
   image?: string | null;
 };
 
-export function AppSidebar({ user }: { user: AppSidebarUser }) {
+export function AppSidebar({
+  user,
+  collapsed,
+  onToggleCollapsed,
+}: {
+  user: AppSidebarUser;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
+}) {
   const pathname = usePathname();
   const displayName =
     user.name?.trim() ||
@@ -81,35 +125,59 @@ export function AppSidebar({ user }: { user: AppSidebarUser }) {
   const initial = displayName.trim().charAt(0).toUpperCase() || "?";
   const accountActive = pathname === "/account";
 
+  const sidebarW = collapsed ? SIDEBAR_COLLAPSED_PX : SIDEBAR_EXPANDED_PX;
+
   return (
-    <aside className="fixed left-0 top-0 z-40 flex h-dvh w-[260px] shrink-0 flex-col overflow-y-auto border-r border-[var(--border)] bg-[var(--surface)] px-4 pb-5 pt-6">
+    <aside
+      style={{ width: sidebarW }}
+      className={`fixed left-0 top-0 z-40 flex h-dvh shrink-0 flex-col overflow-x-hidden overflow-y-auto border-r border-[var(--border)] bg-[var(--surface)] pt-6 pb-5 transition-[width,padding] duration-300 ease-out ${
+        collapsed ? "px-2" : "px-4"
+      }`}
+    >
       <Link
         href="/"
-        className="group flex items-center gap-3 px-2 outline-offset-4 transition-opacity hover:opacity-90 focus-visible:opacity-90"
+        title={collapsed ? "smmplaner — на главную" : undefined}
+        className={`group flex items-center outline-offset-4 transition-opacity hover:opacity-90 focus-visible:opacity-90 ${
+          collapsed ? "justify-center px-0" : "gap-3 px-2"
+        }`}
       >
         <LogoMark />
-        <span className="text-[15px] font-semibold tracking-wide text-[var(--foreground)]">
+        <span
+          className={
+            collapsed
+              ? "sr-only"
+              : "text-[15px] font-semibold tracking-wide text-[var(--foreground)]"
+          }
+        >
           smmplaner
         </span>
       </Link>
 
-      <Divider />
+      <Divider collapsed={collapsed} />
 
       <nav className="flex flex-col gap-0.5" aria-label="Основное меню">
         {mainNav.map((item) => (
           <NavItem
             key={item.href}
             href={item.href}
+            collapsed={collapsed}
             active={isNavActive(pathname, item.href)}
+            icon={<item.Icon className="size-5" />}
           >
             {item.label}
           </NavItem>
         ))}
       </nav>
 
-      <Divider />
+      <Divider collapsed={collapsed} />
 
-      <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+      <p
+        className={
+          collapsed
+            ? "sr-only"
+            : "mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]"
+        }
+      >
         Контент
       </p>
       <nav className="flex flex-col gap-0.5" aria-label="Контент">
@@ -117,18 +185,47 @@ export function AppSidebar({ user }: { user: AppSidebarUser }) {
           <NavItem
             key={item.href}
             href={item.href}
+            collapsed={collapsed}
             active={isNavActive(pathname, item.href)}
+            icon={<item.Icon className="size-5" />}
           >
             {item.label}
           </NavItem>
         ))}
       </nav>
 
-      <div className="mt-auto border-t border-[var(--border)] pt-5">
-        <ThemeToggle />
+      <div className="mt-auto border-t border-[var(--border)] pt-4">
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          aria-expanded={!collapsed}
+          aria-label={
+            collapsed ? "Развернуть боковую панель" : "Свернуть боковую панель"
+          }
+          className={`mb-3 flex w-full items-center rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] py-2 text-[var(--muted)] transition-[padding,gap,colors] duration-300 ease-out hover:bg-[var(--border)] hover:text-[var(--foreground)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
+            collapsed ? "justify-center px-0" : "justify-center gap-2 px-3"
+          }`}
+        >
+          {collapsed ? (
+            <IconChevronRight className="size-5 shrink-0" aria-hidden />
+          ) : (
+            <>
+              <IconChevronLeft className="size-4 shrink-0" aria-hidden />
+              <span className="text-[12px] font-medium" aria-hidden>
+                Свернуть
+              </span>
+            </>
+          )}
+        </button>
+
+        <ThemeToggle compact={collapsed} />
+
         <Link
           href="/account"
-          className={`flex items-center gap-3 rounded-xl px-2 py-2 outline-offset-2 transition-colors focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+          title={collapsed ? `${displayName} · ${subtitle}` : undefined}
+          className={`flex items-center rounded-xl py-2 outline-offset-2 transition-[padding,gap] duration-300 ease-out focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+            collapsed ? "justify-center px-0" : "gap-3 px-2"
+          } ${
             accountActive
               ? "bg-[var(--accent-soft)]"
               : "hover:bg-[var(--surface-elevated)]"
@@ -152,7 +249,13 @@ export function AppSidebar({ user }: { user: AppSidebarUser }) {
               {initial}
             </span>
           )}
-          <div className="min-w-0 flex-1">
+          <div
+            className={
+              collapsed
+                ? "sr-only"
+                : "min-w-0 flex-1 overflow-hidden text-ellipsis"
+            }
+          >
             <p className="truncate text-[14px] font-medium text-[var(--foreground)]">
               {displayName}
             </p>

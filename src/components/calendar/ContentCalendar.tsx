@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useLayoutEffect, useMemo, useState } from "react";
 import {
-  clientCalendarShortHandle,
+  postCalendarShortHandle,
   POST_DRAFT_STATUS_LABELS,
   type ClientRecord,
   type PostDraftRecord,
@@ -71,11 +72,14 @@ export function ContentCalendar({
   clients,
   defaultYear,
   defaultMonthIndex,
+  filtersSlot,
 }: {
   posts: PostDraftRecord[];
   clients: ClientRecord[];
   defaultYear: number;
   defaultMonthIndex: number;
+  /** Если задан — показывается слева от сетки дней, на одной линии с ней (под строкой месяца). */
+  filtersSlot?: ReactNode;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -97,11 +101,6 @@ export function ContentCalendar({
     setMonthIndex(m);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [searchParams, fallback]);
-
-  const clientById = useMemo(
-    () => Object.fromEntries(clients.map((c) => [c.id, c])),
-    [clients]
-  );
 
   /** Скрывать @ник в ячейке, если в данных только один клиент (страница карточки). */
   const showClientInSlot = useMemo(() => {
@@ -137,37 +136,12 @@ export function ContentCalendar({
     setMonthIndex(d.getMonth());
   }
 
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-[17px] font-semibold capitalize tracking-tight text-[var(--foreground)]">
-          {monthTitle}
-        </h2>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => shiftMonth(-1)}
-            className="rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-1.5 text-[13px] font-medium text-[var(--foreground)] outline-offset-2 transition-colors hover:bg-[var(--surface)] focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-            aria-label="Предыдущий месяц"
-          >
-            ←
-          </button>
-          <button
-            type="button"
-            onClick={() => shiftMonth(1)}
-            className="rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-1.5 text-[13px] font-medium text-[var(--foreground)] outline-offset-2 transition-colors hover:bg-[var(--surface)] focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-            aria-label="Следующий месяц"
-          >
-            →
-          </button>
-        </div>
-      </div>
-
-      <div
-        className="grid grid-cols-7 gap-px overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--border)]"
-        role="grid"
-        aria-label="Календарь публикаций"
-      >
+  const calendarGrid = (
+    <div
+      className="grid grid-cols-7 gap-px overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--border)]"
+      role="grid"
+      aria-label="Календарь публикаций"
+    >
         {WEEKDAYS.map((d) => (
           <div
             key={d}
@@ -199,8 +173,12 @@ export function ContentCalendar({
               </span>
               <ul className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
                 {dayPosts.map((post) => {
-                  const client = clientById[post.clientId];
-                  const label = clientCalendarShortHandle(client, post.clientId);
+                  const label = postCalendarShortHandle(post, clients);
+                  const clientRow = clients.find((c) => c.id === post.clientId);
+                  const acc = clientRow?.socialAccounts.find(
+                    (s) => s.id === post.socialAccountId
+                  );
+                  const platform = acc?.platform ?? "instagram";
                   const borderColor = BORDER_BY_STATUS[post.status];
                   const captionLine =
                     post.caption.split("\n").find((l) => l.trim())?.slice(0, 140) ?? "";
@@ -208,9 +186,9 @@ export function ContentCalendar({
                     post.publishTime
                   )}`;
                   const clientSlot =
-                    client?.platform === "telegram"
+                    platform === "telegram"
                       ? `TG ${label}`
-                      : client?.platform === "vk"
+                      : platform === "vk"
                         ? `VK ${label}`
                         : `@${label}`;
                   const title = showClientInSlot
@@ -230,7 +208,7 @@ export function ContentCalendar({
                         </span>
                         {showClientInSlot ? (
                           <span className="text-[var(--foreground)]">
-                            {client?.platform === "instagram" ? (
+                            {platform === "instagram" ? (
                               <> @{label}</>
                             ) : (
                               <> {label}</>
@@ -248,7 +226,45 @@ export function ContentCalendar({
             </div>
           );
         })}
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-[17px] font-semibold capitalize tracking-tight text-[var(--foreground)]">
+          {monthTitle}
+        </h2>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => shiftMonth(-1)}
+            className="rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-1.5 text-[13px] font-medium text-[var(--foreground)] outline-offset-2 transition-colors hover:bg-[var(--surface)] focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+            aria-label="Предыдущий месяц"
+          >
+            ←
+          </button>
+          <button
+            type="button"
+            onClick={() => shiftMonth(1)}
+            className="rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-1.5 text-[13px] font-medium text-[var(--foreground)] outline-offset-2 transition-colors hover:bg-[var(--surface)] focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+            aria-label="Следующий месяц"
+          >
+            →
+          </button>
+        </div>
       </div>
+
+      {filtersSlot ? (
+        <div className="flex min-w-0 flex-col gap-6 lg:flex-row lg:items-stretch lg:gap-6">
+          <aside className="flex w-full shrink-0 flex-col self-stretch min-h-0 lg:sticky lg:top-5 lg:w-[13.5rem] lg:min-w-0 xl:w-[15rem]">
+            {filtersSlot}
+          </aside>
+          <div className="min-w-0 flex-1 lg:min-h-0">{calendarGrid}</div>
+        </div>
+      ) : (
+        calendarGrid
+      )}
 
       <div className="flex flex-wrap gap-x-5 gap-y-2 text-[12px] text-[var(--muted)]">
         <LegendItem statusKey="draft" label="Черновик" />

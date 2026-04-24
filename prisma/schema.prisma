@@ -56,61 +56,75 @@ model User {
 }
 
 model Client {
-  id                 String   @id @default(cuid())
-  userId             String   @map("user_id")
-  fullName           String   @map("full_name")
-  platform           ClientPlatform @default(instagram) @map("platform")
-  instagramUsername  String   @map("instagram_username")
+  id              String   @id @default(cuid())
+  userId          String   @map("user_id")
+  fullName        String   @map("full_name")
   /// JSON array of 1–2 sphere labels
-  activitySpheres    Json     @map("activity_spheres")
-  contact            String?  @db.Text
-  instagramBusinessId String? @map("instagram_business_id")
-  facebookPageId     String?  @map("facebook_page_id")
-  /// Чувствительные данные: храните БД в доверенной среде; для продакшена рассмотрите шифрование/vault.
-  pageAccessToken    String?  @map("page_access_token") @db.Text
-  businessAccountConfirmed Boolean @default(false) @map("business_account_confirmed")
-  /// Токен бота от @BotFather (секрет); для отправки в Telegram Bot API.
-  telegramBotToken   String?  @map("telegram_bot_token") @db.Text
-  /// ID чата/канала, куда отправлять посты.
-  telegramChatId     String?  @map("telegram_chat_id") @db.Text
-  /// Токен пользователя или сообщества ВК для вызова API (секрет).
-  vkAccessToken      String?  @map("vk_access_token") @db.Text
-  /// owner_id для wall.post: отрицательный — стена сообщества, положительный — пользователя.
-  vkOwnerId          String?  @map("vk_owner_id") @db.Text
-  /// Публиковать от имени сообщества (параметр from_group в wall.post).
-  vkFromGroup        Boolean  @default(false) @map("vk_from_group")
-  createdAt          DateTime @default(now()) @map("created_at")
-  updatedAt          DateTime @updatedAt @map("updated_at")
+  activitySpheres Json     @map("activity_spheres")
+  contact         String?  @db.Text
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
-  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  posts Post[]
+  user             User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  socialAccounts   ClientSocialAccount[]
 
   @@index([userId])
   @@map("clients")
 }
 
-model Post {
-  id                 String           @id @default(cuid())
-  userId             String           @map("user_id")
-  clientId           String           @map("client_id")
-  status             PostDraftStatus
-  postType           PostContentType  @map("post_type")
-  caption            String           @db.Text
-  location           String           @default("")
-  firstComment       String           @default("") @map("first_comment")
-  altText            String           @default("") @map("alt_text")
-  imageUrls          Json             @map("image_urls")
-  publishDate        String           @map("publish_date")
-  publishTime        String           @map("publish_time")
-  createdAt          DateTime         @map("created_at")
-  clientReviewToken  String           @unique @map("client_review_token")
+/// Подключённая соцсеть клиента (Instagram / Telegram / ВК): учётные данные и посты.
+model ClientSocialAccount {
+  id                      String         @id @default(cuid())
+  clientId                String         @map("client_id")
+  platform                ClientPlatform
+  instagramUsername       String         @default("") @map("instagram_username")
+  instagramBusinessId     String?        @map("instagram_business_id")
+  facebookPageId          String?        @map("facebook_page_id")
+  /// Чувствительные данные: храните БД в доверенной среде; для продакшена рассмотрите шифрование/vault.
+  pageAccessToken         String?        @map("page_access_token") @db.Text
+  businessAccountConfirmed Boolean       @default(false) @map("business_account_confirmed")
+  /// Токен бота от @BotFather (секрет); для отправки в Telegram Bot API.
+  telegramBotToken        String?        @map("telegram_bot_token") @db.Text
+  /// ID чата/канала, куда отправлять посты.
+  telegramChatId          String?        @map("telegram_chat_id") @db.Text
+  /// Токен пользователя или сообщества ВК для вызова API (секрет).
+  vkAccessToken           String?        @map("vk_access_token") @db.Text
+  /// owner_id для wall.post: отрицательный — стена сообщества, положительный — пользователя.
+  vkOwnerId               String?        @map("vk_owner_id") @db.Text
+  /// Публиковать от имени сообщества (параметр from_group в wall.post).
+  vkFromGroup             Boolean        @default(false) @map("vk_from_group")
+  createdAt               DateTime       @default(now()) @map("created_at")
+  updatedAt               DateTime       @updatedAt @map("updated_at")
 
-  user       User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  client     Client               @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  discussion PostReviewComment[]
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  posts  Post[]
+
+  @@index([clientId])
+  @@map("client_social_accounts")
+}
+
+model Post {
+  id                      String           @id @default(cuid())
+  userId                  String           @map("user_id")
+  clientSocialAccountId   String           @map("client_social_account_id")
+  status                  PostDraftStatus
+  postType                PostContentType  @map("post_type")
+  caption                 String           @db.Text
+  location                String           @default("")
+  firstComment            String           @default("") @map("first_comment")
+  altText                 String           @default("") @map("alt_text")
+  imageUrls               Json             @map("image_urls")
+  publishDate             String           @map("publish_date")
+  publishTime             String           @map("publish_time")
+  createdAt               DateTime         @map("created_at")
+  clientReviewToken       String           @unique @map("client_review_token")
+
+  user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  socialAccount ClientSocialAccount  @relation(fields: [clientSocialAccountId], references: [id], onDelete: Cascade)
+  discussion    PostReviewComment[]
 
   @@index([userId])
-  @@index([clientId])
+  @@index([clientSocialAccountId])
   @@index([userId, publishDate])
   @@map("posts")
 }

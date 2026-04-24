@@ -1,7 +1,11 @@
 import Image from "next/image";
 import { isPublicUploadImageSrc } from "@/lib/media-display";
 import Link from "next/link";
-import { clientSelectLabel, type ClientRecord, type PostDraftRecord } from "@/domain/smm";
+import {
+  clientSocialSelectLabel,
+  type ClientRecord,
+  type PostDraftRecord,
+} from "@/domain/smm";
 import { POST_TYPE_OPTIONS } from "@/types/postType";
 
 function scheduledAtIso(date: string, time: string) {
@@ -62,6 +66,9 @@ export function DashboardUpcomingPosts({
         <ul className="flex flex-col gap-3">
           {posts.map((post) => {
             const client = clientById[post.clientId];
+            const socialAcc = client?.socialAccounts.find(
+              (s) => s.id === post.socialAccountId
+            );
             const thumb = post.imageUrls[0];
             const captionPreview =
               post.caption.split("\n").find((l) => l.trim())?.slice(0, 100) ??
@@ -97,9 +104,13 @@ export function DashboardUpcomingPosts({
                         {postTypeLabel(post.postType)}
                       </span>
                     </div>
-                    {client ? (
+                    {client && socialAcc ? (
                       <p className="mt-0.5 truncate text-[14px] font-semibold text-[var(--foreground)]">
-                        {clientSelectLabel(client)}
+                        {clientSocialSelectLabel(client, socialAcc)}
+                      </p>
+                    ) : client ? (
+                      <p className="mt-0.5 truncate text-[14px] font-semibold text-[var(--foreground)]">
+                        {client.fullName}
                       </p>
                     ) : (
                       <p className="mt-0.5 text-[14px] text-[var(--muted)]">

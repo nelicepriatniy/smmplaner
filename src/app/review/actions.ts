@@ -26,9 +26,15 @@ export async function addDiscussionByTokenAction(
 
   const post = await prisma.post.findFirst({
     where: { clientReviewToken: token.trim() },
-    select: { id: true, userId: true, clientId: true },
+    select: {
+      id: true,
+      userId: true,
+      socialAccount: { select: { clientId: true } },
+    },
   });
   if (!post) return { ok: false, error: "Ссылка недействительна." };
+
+  const clientId = post.socialAccount.clientId;
 
   try {
     await prisma.postReviewComment.create({
@@ -48,11 +54,11 @@ export async function addDiscussionByTokenAction(
         title: "Клиент оставил комментарий к посту",
         detail: trimmed.slice(0, 200),
         postId: post.id,
-        clientId: post.clientId,
+        clientId,
       },
     });
 
-    revalidateForPost(post.id, token, post.clientId);
+    revalidateForPost(post.id, token, clientId);
     return { ok: true };
   } catch (e) {
     console.error(e);
@@ -68,10 +74,12 @@ export async function approvePostByTokenAction(
     select: {
       id: true,
       userId: true,
-      clientId: true,
+      socialAccount: { select: { clientId: true } },
     },
   });
   if (!post) return { ok: false, error: "Ссылка недействительна." };
+
+  const clientId = post.socialAccount.clientId;
 
   try {
     await prisma.$transaction([
@@ -86,12 +94,12 @@ export async function approvePostByTokenAction(
           createdAt: new Date(),
           title: "Клиент одобрил пост",
           postId: post.id,
-          clientId: post.clientId,
+          clientId,
         },
       }),
     ]);
 
-    revalidateForPost(post.id, token, post.clientId);
+    revalidateForPost(post.id, token, clientId);
     return { ok: true };
   } catch (e) {
     console.error(e);
@@ -104,9 +112,15 @@ export async function rejectPostByTokenAction(
 ): Promise<ReviewActionResult> {
   const post = await prisma.post.findFirst({
     where: { clientReviewToken: token.trim() },
-    select: { id: true, userId: true, clientId: true },
+    select: {
+      id: true,
+      userId: true,
+      socialAccount: { select: { clientId: true } },
+    },
   });
   if (!post) return { ok: false, error: "Ссылка недействительна." };
+
+  const clientId = post.socialAccount.clientId;
 
   try {
     await prisma.$transaction([
@@ -121,12 +135,12 @@ export async function rejectPostByTokenAction(
           createdAt: new Date(),
           title: "Клиент отклонил вариант",
           postId: post.id,
-          clientId: post.clientId,
+          clientId,
         },
       }),
     ]);
 
-    revalidateForPost(post.id, token, post.clientId);
+    revalidateForPost(post.id, token, clientId);
     return { ok: true };
   } catch (e) {
     console.error(e);

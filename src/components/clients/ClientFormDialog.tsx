@@ -48,37 +48,7 @@ type FormState = {
   vkAccessToken: string;
 };
 
-function vkInitialWallKind(client: ClientRecord): VkWallKind {
-  const id = client.vkOwnerId?.trim();
-  if (!id) return "group";
-  return id.startsWith("-") ? "group" : "user";
-}
-
-function vkInitialEntityId(client: ClientRecord): string {
-  const id = client.vkOwnerId?.trim().replace(/^-/, "") ?? "";
-  return id.replace(/\D/g, "");
-}
-
-function buildInitialState(mode: ClientFormMode, client: ClientRecord | null): FormState {
-  if (mode === "edit" && client) {
-    return {
-      platform: client.platform,
-      fullName: client.fullName,
-      instagramUsername: client.instagramUsername,
-      instagramBusinessId: client.instagramBusinessId ?? "",
-      facebookPageId: client.facebookPageId ?? "",
-      pageAccessToken: "",
-      businessAccountConfirmed: client.businessAccountConfirmed ?? false,
-      contact: client.contact ?? "",
-      activitySpheres: client.activitySpheres.join(", "),
-      telegramBotToken: "",
-      telegramChatId: client.telegramChatId ?? "",
-      vkWallKind: vkInitialWallKind(client),
-      vkWallEntityId: vkInitialEntityId(client),
-      vkFromGroup: client.vkFromGroup ?? false,
-      vkAccessToken: "",
-    };
-  }
+function buildInitialState(): FormState {
   return {
     platform: "instagram",
     fullName: "",
@@ -98,18 +68,156 @@ function buildInitialState(mode: ClientFormMode, client: ClientRecord | null): F
   };
 }
 
-type ClientFormBodyProps = {
-  mode: ClientFormMode;
-  client: ClientRecord | null;
+type ClientEditProfileBodyProps = {
+  client: ClientRecord;
   onDismiss: () => void;
   onSaved?: () => void;
 };
 
-function ClientFormBody({ mode, client, onDismiss, onSaved }: ClientFormBodyProps) {
+function ClientEditProfileBody({
+  client,
+  onDismiss,
+  onSaved,
+}: ClientEditProfileBodyProps) {
   const formId = useId();
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
-  const [values, setValues] = useState<FormState>(() => buildInitialState(mode, client));
+  const [isPending, startTransition] = useTransition();
+
+  const onSubmit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    setErrorMessage("");
+    setStatus("idle");
+    startTransition(async () => {
+      const res = await updateClientAction(client.id, fd);
+      if (res.ok) {
+        setStatus("success");
+        onSaved?.();
+      } else {
+        setStatus("error");
+        setErrorMessage(res.error);
+      }
+    });
+  };
+
+  return (
+    <form
+      className="flex min-h-0 flex-1 flex-col p-5 sm:p-6"
+      onSubmit={onSubmit}
+    >
+      <div className="pr-6">
+        <h2 className="text-[17px] font-semibold tracking-tight">Редактирование клиента</h2>
+        <p className="mt-2 text-[13px] leading-relaxed text-[var(--muted)]">
+          Имя, сферы и контакт. Подключённые соцсети меняются на странице клиента.
+          <span className="mt-2 block text-[12px] text-[var(--muted)]">ID: {client.id}</span>
+        </p>
+      </div>
+
+      {status === "success" ? (
+        <div className="mt-6 flex min-h-0 flex-1 flex-col justify-center rounded-xl border border-[color-mix(in_srgb,var(--accent)_30%,var(--border))] bg-[var(--surface-elevated)] px-4 py-8 text-center">
+          <p className="text-[15px] font-medium text-[var(--foreground)]">Сохранено</p>
+          <p className="mt-2 text-[13px] text-[var(--muted)]">Карточка клиента обновлена.</p>
+          <button
+            type="button"
+            className={`${btnPrimaryClass} mt-6 self-center`}
+            onClick={onDismiss}
+          >
+            Закрыть
+          </button>
+        </div>
+      ) : (
+        <div className="mt-6 min-h-0 flex-1 space-y-4 overflow-y-auto pr-0.5">
+          {status === "error" && errorMessage ? (
+            <p
+              className="rounded-lg border border-rose-500/40 bg-rose-950/30 px-3 py-2 text-[13px] text-rose-100"
+              role="alert"
+            >
+              {errorMessage}
+            </p>
+          ) : null}
+          <div>
+            <label
+              htmlFor={`${formId}-ename`}
+              className="text-[14px] font-medium text-[var(--foreground)]"
+            >
+              Название (бренд, компания или ФИО)
+            </label>
+            <input
+              id={`${formId}-ename`}
+              name="fullName"
+              className={`mt-2 ${inputClass}`}
+              defaultValue={client.fullName}
+              required
+              autoComplete="organization"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor={`${formId}-econtact`}
+              className="text-[14px] font-medium text-[var(--foreground)]"
+            >
+              Контакт для связи
+            </label>
+            <input
+              id={`${formId}-econtact`}
+              name="contact"
+              className={`mt-2 ${inputClass}`}
+              defaultValue={client.contact ?? ""}
+              autoComplete="off"
+              placeholder="email, Telegram, телефон…"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor={`${formId}-espheres`}
+              className="text-[14px] font-medium text-[var(--foreground)]"
+            >
+              Сферы деятельности
+            </label>
+            <input
+              id={`${formId}-espheres`}
+              name="activitySpheres"
+              className={`mt-2 ${inputClass}`}
+              defaultValue={client.activitySpheres.join(", ")}
+              autoComplete="off"
+              placeholder="через запятую, например: кофейня, доставка"
+            />
+            <p className="mt-1 text-[12px] text-[var(--muted)]">Необязательно, 1–2 сферы.</p>
+          </div>
+        </div>
+      )}
+
+      {status === "success" ? null : (
+        <div className="mt-6 flex flex-wrap justify-end gap-2 border-t border-[var(--border)] pt-5 sm:gap-3">
+          <button
+            type="button"
+            onClick={onDismiss}
+            className={btnGhostClass}
+            disabled={isPending}
+          >
+            Отмена
+          </button>
+          <button type="submit" className={btnPrimaryClass} disabled={isPending}>
+            {isPending ? "Сохранение…" : "Сохранить"}
+          </button>
+        </div>
+      )}
+    </form>
+  );
+}
+
+type ClientAddFormBodyProps = {
+  onDismiss: () => void;
+  onSaved?: () => void;
+};
+
+function ClientAddFormBody({ onDismiss, onSaved }: ClientAddFormBodyProps) {
+  const formId = useId();
+  const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [values, setValues] = useState<FormState>(() => buildInitialState());
   const [isPending, startTransition] = useTransition();
 
   const setField = <K extends keyof FormState>(k: K, v: FormState[K]) => {
@@ -124,10 +232,7 @@ function ClientFormBody({ mode, client, onDismiss, onSaved }: ClientFormBodyProp
     setStatus("idle");
 
     startTransition(async () => {
-      const res =
-        mode === "add"
-          ? await createClientAction(fd)
-          : await updateClientAction(client!.id, fd);
+      const res = await createClientAction(fd);
       if (res.ok) {
         setStatus("success");
         onSaved?.();
@@ -138,34 +243,25 @@ function ClientFormBody({ mode, client, onDismiss, onSaved }: ClientFormBodyProp
     });
   };
 
-  const title = mode === "add" ? "Новый клиент" : "Редактирование клиента";
+  const title = "Новый клиент";
   const lead =
-    mode === "add" ? (
-      values.platform === "telegram" ? (
-        <>
-          Посты для этого клиента планируются для отправки в указанный Telegram-чат через вашего
-          бота (токен от @BotFather и ID чата сохраняются в базе).
-        </>
-      ) : values.platform === "vk" ? (
-        <>
-          Данные для вызова VK API (метод{" "}
-          <code className="rounded bg-[var(--surface-elevated)] px-1">wall.post</code>
-          ): access token, владелец стены (owner_id) и публикация от имени сообщества при
-          необходимости. Токен хранится в базе — доверенный сервер и ограничение прав токена.
-        </>
-      ) : (
-        <>
-          Укажите контакты и при необходимости данные для публикации через Instagram Graph API
-          (ID бизнес-аса, страницы Facebook, токен). Токен хранится в базе — используйте
-          доверенный сервер и HTTPS.
-        </>
-      )
+    values.platform === "telegram" ? (
+      <>
+        Посты для этого клиента планируются для отправки в указанный Telegram-чат через вашего
+        бота (токен от @BotFather и ID чата сохраняются в базе).
+      </>
+    ) : values.platform === "vk" ? (
+      <>
+        Данные для вызова VK API (метод{" "}
+        <code className="rounded bg-[var(--surface-elevated)] px-1">wall.post</code>
+        ): access token, владелец стены (owner_id) и публикация от имени сообщества при
+        необходимости. Токен хранится в базе — доверенный сервер и ограничение прав токена.
+      </>
     ) : (
       <>
-        Изменения сохраняются в вашей базе данных.
-        {client ? (
-          <span className="mt-2 block text-[12px] text-[var(--muted)]">ID: {client.id}</span>
-        ) : null}
+        Укажите контакты и при необходимости данные для публикации через Instagram Graph API
+        (ID бизнес-аса, страницы Facebook, токен). Токен хранится в базе — используйте
+        доверенный сервер и HTTPS.
       </>
     );
 
@@ -182,9 +278,7 @@ function ClientFormBody({ mode, client, onDismiss, onSaved }: ClientFormBodyProp
       {status === "success" ? (
         <div className="mt-6 flex min-h-0 flex-1 flex-col justify-center rounded-xl border border-[color-mix(in_srgb,var(--accent)_30%,var(--border))] bg-[var(--surface-elevated)] px-4 py-8 text-center">
           <p className="text-[15px] font-medium text-[var(--foreground)]">Сохранено</p>
-          <p className="mt-2 text-[13px] text-[var(--muted)]">
-            {mode === "add" ? "Клиент добавлен в список." : "Карточка клиента обновлена."}
-          </p>
+          <p className="mt-2 text-[13px] text-[var(--muted)]">Клиент добавлен в список.</p>
           <button
             type="button"
             className={`${btnPrimaryClass} mt-6 self-center`}
@@ -268,13 +362,16 @@ function ClientFormBody({ mode, client, onDismiss, onSaved }: ClientFormBodyProp
                 в <code className="rounded bg-[var(--background)] px-1">.env</code> /{" "}
                 <code className="rounded bg-[var(--background)] px-1">.env.local</code>, затем
                 перезапуск <code className="rounded bg-[var(--background)] px-1">npm run dev</code>.
-                Для публикации постов во ВК у токена должны быть права API{" "}
+                В кабинете VK ID раздел «Доступы» обычно показывает только профиль (и опционально почту
+                / телефон) — отдельных галочек «wall» или «photos» там часто нет: это нормально. Для
+                публикации на стене нужен токен с правами API{" "}
                 <code className="rounded bg-[var(--background)] px-1">wall</code>,{" "}
-                <code className="rounded bg-[var(--background)] px-1">photos</code> (и при необходимости{" "}
-                <code className="rounded bg-[var(--background)] px-1">groups</code>): включите их в
-                кабинете приложения VK ID → «Доступы», задайте{" "}
-                <code className="rounded bg-[var(--background)] px-1">NEXT_PUBLIC_VK_SCOPE</code> и
-                войдите через кнопку снова. Иначе api.vk.com ответит «Access denied… [15]».
+                <code className="rounded bg-[var(--background)] px-1">photos</code> и т.д.: попробуйте{" "}
+                <code className="rounded bg-[var(--background)] px-1">NEXT_PUBLIC_VK_SCOPE</code> (в
+                доке VK ID — через пробел) и вход только аккаунтом ВКонтакте; если api.vk.com всё равно
+                даёт 15/1051 — используйте ключ группы («Работа с API»), токен с{" "}
+                <code className="rounded bg-[var(--background)] px-1">dev.vk.com</code> вручную или
+                согласуйте доступы с поддержкой VK ID (devsupport@corp.vk.com).
               </p>
               <VkIdTokenButton
                 disabled={isPending}
@@ -400,11 +497,7 @@ function ClientFormBody({ mode, client, onDismiss, onSaved }: ClientFormBodyProp
                   onChange={(e) => setField("pageAccessToken", e.target.value)}
                   autoComplete="off"
                   rows={3}
-                  placeholder={
-                    mode === "edit"
-                      ? "Оставьте пустым, чтобы не менять сохранённый токен; вставьте новый, чтобы заменить."
-                      : "Долгоживущий токен страницы с нужными scope…"
-                  }
+                  placeholder="Долгоживущий токен страницы с нужными scope…"
                 />
                 <p className="mt-1 text-[12px] text-[var(--muted)]">
                   Хранится в БД на сервере; не передаётся обратно в форму при редактировании.
@@ -447,10 +540,7 @@ function ClientFormBody({ mode, client, onDismiss, onSaved }: ClientFormBodyProp
                   className={`mt-2 min-h-[4.5rem] resize-y ${inputClass} font-mono text-[12px] leading-normal`}
                   value={values.telegramBotToken}
                   onChange={(e) => setField("telegramBotToken", e.target.value)}
-                  required={
-                    mode === "add" ||
-                    (mode === "edit" && client != null && !client.hasTelegramBotToken)
-                  }
+                  required={values.platform === "telegram"}
                   autoComplete="off"
                   rows={3}
                   placeholder="123456789:AA… (от @BotFather)"
@@ -458,12 +548,6 @@ function ClientFormBody({ mode, client, onDismiss, onSaved }: ClientFormBodyProp
                 <p className="mt-1 text-[12px] text-[var(--muted)]">
                   Полная строка токена — в БД на сервере; в форму при редактировании не
                   подставляется.
-                  {mode === "edit" && client?.hasTelegramBotToken ? (
-                    <span className="mt-1 block">
-                      Оставьте поле пустым, чтобы не менять сохранённый токен; вставьте новый,
-                      чтобы заменить.
-                    </span>
-                  ) : null}
                 </p>
               </div>
               <div>
@@ -597,10 +681,7 @@ function ClientFormBody({ mode, client, onDismiss, onSaved }: ClientFormBodyProp
                   className={`mt-2 min-h-[4.5rem] resize-y ${inputClass} font-mono text-[12px] leading-normal`}
                   value={values.vkAccessToken}
                   onChange={(e) => setField("vkAccessToken", e.target.value)}
-                  required={
-                    mode === "add" ||
-                    (mode === "edit" && client != null && !client.hasVkAccessToken)
-                  }
+                  required={values.platform === "vk"}
                   autoComplete="off"
                   rows={3}
                   placeholder="Лучше пользовательский OAuth-токен (scope photos, wall)…"
@@ -610,11 +691,6 @@ function ClientFormBody({ mode, client, onDismiss, onSaved }: ClientFormBodyProp
                   страницы), а не ключ доступа сообщества: у ВК методы загрузки фото на стену с
                   «групповым» токеном недоступны (ошибка 27). Секрет хранится в БД; при редактировании
                   не подставляется.
-                  {mode === "edit" && client?.hasVkAccessToken ? (
-                    <span className="mt-1 block">
-                      Оставьте пустым, чтобы не менять токен; вставьте новый, чтобы заменить.
-                    </span>
-                  ) : null}
                 </p>
               </div>
             </>
@@ -723,13 +799,20 @@ export function ClientFormDialog({
             onClick={(e) => e.stopPropagation()}
             role="presentation"
           >
-            <ClientFormBody
-              key={session}
-              mode={mode}
-              client={client}
-              onDismiss={onRequestClose}
-              onSaved={onSaved}
-            />
+            {mode === "edit" && client ? (
+              <ClientEditProfileBody
+                key={session}
+                client={client}
+                onDismiss={onRequestClose}
+                onSaved={onSaved}
+              />
+            ) : (
+              <ClientAddFormBody
+                key={session}
+                onDismiss={onRequestClose}
+                onSaved={onSaved}
+              />
+            )}
           </div>
         </div>
       ) : null}

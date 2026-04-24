@@ -1,6 +1,33 @@
 import type { PostDraftRecord } from "@/domain/smm";
 import { H_MS, MOCK_DISCUSSION_REF_MS } from "@/domain/smm";
 
+type DemoPostSeed = Omit<PostDraftRecord, "socialAccountId" | "socialAccount">;
+
+const _IG_HANDLE: Record<string, string> = {
+  c1: "volkovabeauty",
+  c2: "brewcorner_spb",
+  c3: "orlov_fit",
+  c4: "linia_interior",
+  c5: "elena_psy_talk",
+};
+
+function attachDemoSocial(rows: DemoPostSeed[]): PostDraftRecord[] {
+  return rows.map((p) => {
+    const sid = `soc-${p.clientId}`;
+    const handle = _IG_HANDLE[p.clientId] ?? "";
+    return {
+      ...p,
+      socialAccountId: sid,
+      socialAccount: {
+        id: sid,
+        clientId: p.clientId,
+        platform: "instagram",
+        instagramUsername: handle,
+      },
+    };
+  });
+}
+
 /** Статичные строки для prisma seed (старые id c1…, p1…). */
 export const demoClientsFixture = [
   {
@@ -35,7 +62,7 @@ export const demoClientsFixture = [
   },
 ];
 
-export const demoPostsFixture: PostDraftRecord[] = [
+const _demoPostsRaw: DemoPostSeed[] = [
   {
     id: "p1",
     clientId: "c1",
@@ -567,6 +594,8 @@ export const demoPostsFixture: PostDraftRecord[] = [
     createdAt: "2026-04-22T14:00:00+03:00",
   },
 ];
+
+export const demoPostsFixture = attachDemoSocial(_demoPostsRaw);
 
 export const demoActivitiesFixture = [
   {

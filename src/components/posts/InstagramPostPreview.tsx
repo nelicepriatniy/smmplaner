@@ -3,11 +3,14 @@
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { PostType } from "@/types/postType";
-import { postPreviewAuthorUsername, type ClientRecord } from "@/domain/smm";
+import {
+  postPreviewAuthorUsername,
+  type PostPublisherPreview,
+} from "@/domain/smm";
 
 type InstagramPostPreviewProps = {
   postType: PostType;
-  client: ClientRecord | null;
+  publisher: PostPublisherPreview | null;
   imageUrls: string[];
   caption: string;
   location: string;
@@ -126,7 +129,7 @@ function buildCaptionText(text: string, username: string) {
 }
 
 type FeedProps = {
-  client: ClientRecord | null;
+  publisher: PostPublisherPreview | null;
   imageUrls: string[];
   caption: string;
   location: string;
@@ -136,7 +139,7 @@ type FeedProps = {
 };
 
 function InstagramFeedPostPreview({
-  client,
+  publisher,
   imageUrls,
   caption,
   location,
@@ -146,7 +149,7 @@ function InstagramFeedPostPreview({
 }: FeedProps) {
   const [slide, setSlide] = useState(0);
   const n = imageUrls.length;
-  const username = postPreviewAuthorUsername(client);
+  const username = postPreviewAuthorUsername(publisher);
 
   const fullCaption = useMemo(
     () => buildCaptionText(caption, username),
@@ -339,7 +342,7 @@ function InstagramFeedPostPreview({
 
 type VertProps = {
   kind: "reels" | "stories";
-  client: ClientRecord | null;
+  publisher: PostPublisherPreview | null;
   imageUrls: string[];
   caption: string;
   firstComment: string;
@@ -348,7 +351,7 @@ type VertProps = {
 
 function ReelsOrStoriesFrame({
   kind,
-  client,
+  publisher,
   imageUrls,
   caption,
   firstComment,
@@ -356,7 +359,7 @@ function ReelsOrStoriesFrame({
 }: VertProps) {
   const [slide, setSlide] = useState(0);
   const n = imageUrls.length;
-  const user = postPreviewAuthorUsername(client);
+  const user = postPreviewAuthorUsername(publisher);
   const hasImg = n > 0;
   const url = hasImg ? imageUrls[Math.min(slide, n - 1)]! : null;
   const cap = caption.trim();
@@ -536,7 +539,7 @@ function ReelsOrStoriesFrame({
 
 export function InstagramPostPreview({
   postType,
-  client,
+  publisher,
   imageUrls,
   caption,
   location,
@@ -547,7 +550,7 @@ export function InstagramPostPreview({
     return (
       <ReelsOrStoriesFrame
         kind="reels"
-        client={client}
+        publisher={publisher}
         imageUrls={imageUrls}
         caption={caption}
         firstComment={firstComment}
@@ -564,7 +567,7 @@ export function InstagramPostPreview({
       >
         <ReelsOrStoriesFrame
           kind="stories"
-          client={client}
+          publisher={publisher}
           imageUrls={imageUrls}
           caption={caption}
           firstComment={firstComment}
@@ -576,7 +579,7 @@ export function InstagramPostPreview({
   return (
     <InstagramFeedPostPreview
       aspect={postType === "photo" ? "photo" : "feed"}
-      client={client}
+      publisher={publisher}
       imageUrls={imageUrls}
       caption={caption}
       location={location}

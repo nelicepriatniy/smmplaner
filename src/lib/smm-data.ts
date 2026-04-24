@@ -1,6 +1,7 @@
 import type {
   Activity as PrismaActivity,
   Client as PrismaClient,
+  ClientSocialAccount as PrismaClientSocialAccount,
   Post as PrismaPost,
   PostReviewComment as PrismaComment,
   PostContentType,
@@ -11,6 +12,7 @@ import type {
   ActivityKind,
   ClientPlatform,
   ClientRecord,
+  ClientSocialAccountRecord,
   PostDraftRecord,
   PostDraftStatus,
   RecentActivityRecord,
@@ -36,12 +38,36 @@ function prismaPostTypeToDomain(t: PostContentType): PostType {
   return t as PostType;
 }
 
-export function toPostDraftRecord(
-  row: PrismaPost & { discussion: PrismaComment[] }
-): PostDraftRecord {
+export function toSocialAccountRecord(
+  row: PrismaClientSocialAccount
+): ClientSocialAccountRecord {
   return {
     id: row.id,
     clientId: row.clientId,
+    platform: row.platform as ClientPlatform,
+    instagramUsername: row.instagramUsername,
+    instagramBusinessId: row.instagramBusinessId ?? undefined,
+    facebookPageId: row.facebookPageId ?? undefined,
+    businessAccountConfirmed: row.businessAccountConfirmed,
+    telegramChatId: row.telegramChatId ?? undefined,
+    hasTelegramBotToken: Boolean(row.telegramBotToken?.trim()),
+    vkOwnerId: row.vkOwnerId ?? undefined,
+    vkFromGroup: row.vkFromGroup,
+    hasVkAccessToken: Boolean(row.vkAccessToken?.trim()),
+  };
+}
+
+type PostRowWithRelations = PrismaPost & {
+  discussion: PrismaComment[];
+  socialAccount: PrismaClientSocialAccount;
+};
+
+export function toPostDraftRecord(row: PostRowWithRelations): PostDraftRecord {
+  return {
+    id: row.id,
+    clientId: row.socialAccount.clientId,
+    socialAccountId: row.clientSocialAccountId,
+    socialAccount: toSocialAccountRecord(row.socialAccount),
     status: prismaStatusToDomain(row.status),
     postType: prismaPostTypeToDomain(row.postType),
     caption: row.caption,
@@ -69,8 +95,12 @@ export function toPostDraftRecord(
   };
 }
 
+type ClientWithSocial = PrismaClient & {
+  socialAccounts: PrismaClientSocialAccount[];
+};
+
 function enrichClientRecord(
-  c: PrismaClient,
+  c: ClientWithSocial,
   posts: PostDraftRecord[],
   refMs: number
 ): ClientRecord {
@@ -87,24 +117,19 @@ function enrichClientRecord(
   }).length;
   const postsPendingReview = mine.filter((p) => p.status === "in_review").length;
 
+  const socialAccounts = [...c.socialAccounts]
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+    .map(toSocialAccountRecord);
+
   return {
     id: c.id,
     fullName: c.fullName,
-    platform: c.platform as ClientPlatform,
-    instagramUsername: c.instagramUsername,
+    socialAccounts,
     postsTotal,
     postsThisMonth,
     postsPendingReview,
     activitySpheres: spheresTuple(c.activitySpheres),
     contact: c.contact ?? undefined,
-    instagramBusinessId: c.instagramBusinessId ?? undefined,
-    facebookPageId: c.facebookPageId ?? undefined,
-    businessAccountConfirmed: c.businessAccountConfirmed,
-    telegramChatId: c.telegramChatId ?? undefined,
-    hasTelegramBotToken: Boolean(c.telegramBotToken?.trim()),
-    vkOwnerId: c.vkOwnerId ?? undefined,
-    vkFromGroup: c.vkFromGroup,
-    hasVkAccessToken: Boolean(c.vkAccessToken?.trim()),
   };
 }
 
@@ -129,6 +154,11 @@ export async function requireUserId(): Promise<string> {
   return id;
 }
 
+const postInclude = {
+  discussion: true,
+  socialAccount: true,
+} as const;
+
 export async function listClientsForUser(
   userId: string,
   refMs: number
@@ -137,10 +167,11 @@ export async function listClientsForUser(
     prisma.client.findMany({
       where: { userId },
       orderBy: { fullName: "asc" },
+      include: { socialAccounts: true },
     }),
     prisma.post.findMany({
       where: { userId },
-      include: { discussion: true },
+      include: postInclude,
     }),
   ]);
   const posts = postRows.map(toPostDraftRecord);
@@ -154,9 +185,11 @@ export async function listPostsForUser(
   const rows = await prisma.post.findMany({
     where: {
       userId,
-      ...(filterClientId ? { clientId: filterClientId } : {}),
+      ...(filterClientId
+        ? { socialAccount: { clientId: filterClientId } }
+        : {}),
     },
-    include: { discussion: true },
+    include: postInclude,
   });
   return rows.map(toPostDraftRecord);
 }
@@ -167,7 +200,7 @@ export async function getPostForUser(
 ): Promise<PostDraftRecord | null> {
   const row = await prisma.post.findFirst({
     where: { id: postId, userId },
-    include: { discussion: true },
+    include: postInclude,
   });
   return row ? toPostDraftRecord(row) : null;
 }
@@ -180,7 +213,7 @@ export async function getPostByClientReviewToken(
   if (!t) return null;
   const row = await prisma.post.findFirst({
     where: { clientReviewToken: t },
-    include: { discussion: true },
+    include: postInclude,
   });
   return row ? toPostDraftRecord(row) : null;
 }
@@ -191,6 +224,7 @@ export async function getClientForUser(
 ): Promise<ClientRecord | null> {
   const row = await prisma.client.findFirst({
     where: { id: clientId, userId },
+    include: { socialAccounts: true },
   });
   if (!row) return null;
   const posts = await listPostsForUser(userId);
@@ -201,22 +235,20 @@ export async function getClientForUser(
 export async function getClientRecordById(
   clientId: string
 ): Promise<ClientRecord | null> {
-  const row = await prisma.client.findUnique({ where: { id: clientId } });
+  const row = await prisma.client.findUnique({
+    where: { id: clientId },
+    include: { socialAccounts: true },
+  });
   if (!row) return null;
   return {
     id: row.id,
     fullName: row.fullName,
-    platform: row.platform as ClientPlatform,
-    instagramUsername: row.instagramUsername,
+    socialAccounts: row.socialAccounts.map(toSocialAccountRecord),
     postsTotal: 0,
     postsThisMonth: 0,
     postsPendingReview: 0,
     activitySpheres: spheresTuple(row.activitySpheres),
-    telegramChatId: row.telegramChatId ?? undefined,
-    hasTelegramBotToken: Boolean(row.telegramBotToken?.trim()),
-    vkOwnerId: row.vkOwnerId ?? undefined,
-    vkFromGroup: row.vkFromGroup,
-    hasVkAccessToken: Boolean(row.vkAccessToken?.trim()),
+    contact: row.contact ?? undefined,
   };
 }
 

@@ -15,7 +15,7 @@ export type PostActionResult =
   | { ok: false; error: string };
 
 export type PostSavePayload = {
-  clientId: string;
+  socialAccountId: string;
   postType: PostType;
   caption: string;
   location: string;
@@ -37,7 +37,6 @@ function sanitizeImageUrlsForStorage(urls: string[]): string[] {
     if (/^https?:\/\//i.test(u)) return true;
     if (!u.startsWith("/uploads/posts/")) return false;
     if (u.includes("..")) return false;
-    // /uploads/posts/{userId}/{filename}
     return /^\/uploads\/posts\/[a-z0-9_-]+\/[a-z0-9_.-]+$/i.test(u);
   });
 }
@@ -53,6 +52,13 @@ function revalidatePostPaths(userId: string, postId: string, clientId: string) {
   revalidatePath(`/posts/${postId}/discussion`);
 }
 
+async function loadSocialAccountForUser(userId: string, socialAccountId: string) {
+  return prisma.clientSocialAccount.findFirst({
+    where: { id: socialAccountId, client: { userId } },
+    include: { client: true },
+  });
+}
+
 async function createPostWithStatus(
   payload: PostSavePayload,
   status: PostDraftStatus
@@ -60,10 +66,8 @@ async function createPostWithStatus(
   const userId = await requireUserId();
   if (!userId) return { ok: false, error: "Нужна авторизация." };
 
-  const client = await prisma.client.findFirst({
-    where: { id: payload.clientId, userId },
-  });
-  if (!client) return { ok: false, error: "Клиент не найден." };
+  const acc = await loadSocialAccountForUser(userId, payload.socialAccountId);
+  if (!acc) return { ok: false, error: "Соцсеть не найдена или не принадлежит вам." };
 
   const imageUrls = sanitizeImageUrlsForStorage(payload.imageUrls);
   const token = newClientReviewToken();
@@ -72,7 +76,7 @@ async function createPostWithStatus(
     const post = await prisma.post.create({
       data: {
         userId,
-        clientId: payload.clientId,
+        clientSocialAccountId: payload.socialAccountId,
         status,
         postType: payload.postType as PostContentType,
         caption: payload.caption,
@@ -87,7 +91,7 @@ async function createPostWithStatus(
       },
     });
 
-    revalidatePostPaths(userId, post.id, payload.clientId);
+    revalidatePostPaths(userId, post.id, acc.clientId);
     return { ok: true, postId: post.id };
   } catch (e) {
     console.error(e);
@@ -107,7 +111,6 @@ export async function createDraftPostAction(
   return createPostWithStatus(payload, "draft");
 }
 
-/** Новый пост сразу как запланированный («чистовик»), не черновик. */
 export async function createScheduledPostAction(
   payload: PostSavePayload
 ): Promise<PostActionResult> {
@@ -123,21 +126,25 @@ export async function updatePostAction(
 
   const existing = await prisma.post.findFirst({
     where: { id: postId, userId },
+    include: { socialAccount: { include: { client: true } } },
   });
   if (!existing) return { ok: false, error: "Пост не найден." };
 
-  const client = await prisma.client.findFirst({
-    where: { id: payload.clientId, userId },
-  });
-  if (!client) return { ok: false, error: "Клиент не найден." };
+  if (existing.status === "published") {
+    return { ok: false, error: "Опубликованный пост нельзя редактировать." };
+  }
+
+  const acc = await loadSocialAccountForUser(userId, payload.socialAccountId);
+  if (!acc) return { ok: false, error: "Соцсеть не найдена или не принадлежит вам." };
 
   const imageUrls = sanitizeImageUrlsForStorage(payload.imageUrls);
+  const prevClientId = existing.socialAccount.clientId;
 
   try {
     await prisma.post.update({
       where: { id: postId },
       data: {
-        clientId: payload.clientId,
+        clientSocialAccountId: payload.socialAccountId,
         postType: payload.postType as PostContentType,
         caption: payload.caption,
         location: payload.location,
@@ -149,7 +156,10 @@ export async function updatePostAction(
       },
     });
 
-    revalidatePostPaths(userId, postId, payload.clientId);
+    revalidatePostPaths(userId, postId, acc.clientId);
+    if (prevClientId !== acc.clientId) {
+      revalidatePath(`/clients/${prevClientId}`);
+    }
     return { ok: true, postId };
   } catch (e) {
     console.error(e);
@@ -157,9 +167,6 @@ export async function updatePostAction(
   }
 }
 
-/**
- * Сохраняет поля поста из формы, отправляет в Telegram или ВКонтакте и ставит статус «опубликован».
- */
 export async function publishPostNowAction(
   postId: string,
   payload: PostSavePayload
@@ -169,6 +176,7 @@ export async function publishPostNowAction(
 
   const existing = await prisma.post.findFirst({
     where: { id: postId, userId },
+    include: { socialAccount: true },
   });
   if (!existing) return { ok: false, error: "Пост не найден." };
 
@@ -179,21 +187,20 @@ export async function publishPostNowAction(
     return { ok: false, error: "Отклонённый пост нельзя опубликовать." };
   }
 
-  const client = await prisma.client.findFirst({
-    where: { id: payload.clientId, userId },
-  });
-  if (!client) return { ok: false, error: "Клиент не найден." };
+  const acc = await loadSocialAccountForUser(userId, payload.socialAccountId);
+  if (!acc) return { ok: false, error: "Соцсеть не найдена или не принадлежит вам." };
 
   const imageUrls = sanitizeImageUrlsForStorage(payload.imageUrls);
   const appBaseUrl = getAppBaseUrl();
+  const clientId = acc.clientId;
 
-  if (client.platform === "telegram") {
-    const botToken = client.telegramBotToken?.trim();
-    const chatId = client.telegramChatId?.trim();
+  if (acc.platform === "telegram") {
+    const botToken = acc.telegramBotToken?.trim();
+    const chatId = acc.telegramChatId?.trim();
     if (!botToken || !chatId) {
       return {
         ok: false,
-        error: "У клиента Telegram не заданы токен бота или ID чата.",
+        error: "У аккаунта Telegram не заданы токен бота или ID чата.",
       };
     }
 
@@ -214,7 +221,7 @@ export async function publishPostNowAction(
         prisma.post.update({
           where: { id: postId },
           data: {
-            clientId: payload.clientId,
+            clientSocialAccountId: payload.socialAccountId,
             postType: payload.postType as PostContentType,
             caption: payload.caption,
             location: payload.location,
@@ -234,14 +241,20 @@ export async function publishPostNowAction(
             title: "Пост опубликован в Telegram",
             detail: payload.caption.trim().slice(0, 200) || undefined,
             postId,
-            clientId: payload.clientId,
+            clientId,
           },
         }),
       ]);
 
-      revalidatePostPaths(userId, postId, payload.clientId);
-      if (existing.clientId !== payload.clientId) {
-        revalidatePath(`/clients/${existing.clientId}`);
+      revalidatePostPaths(userId, postId, clientId);
+      if (existing.clientSocialAccountId !== payload.socialAccountId) {
+        const old = await prisma.clientSocialAccount.findUnique({
+          where: { id: existing.clientSocialAccountId },
+          select: { clientId: true },
+        });
+        if (old && old.clientId !== clientId) {
+          revalidatePath(`/clients/${old.clientId}`);
+        }
       }
       return { ok: true, postId };
     } catch (e) {
@@ -254,20 +267,20 @@ export async function publishPostNowAction(
     }
   }
 
-  if (client.platform === "vk") {
-    const token = client.vkAccessToken?.trim();
-    const ownerRaw = client.vkOwnerId?.trim();
+  if (acc.platform === "vk") {
+    const token = acc.vkAccessToken?.trim();
+    const ownerRaw = acc.vkOwnerId?.trim();
     if (!token || !ownerRaw) {
       return {
         ok: false,
-        error: "У клиента ВКонтакте не заданы access token или owner_id стены.",
+        error: "У аккаунта ВКонтакте не заданы access token или owner_id стены.",
       };
     }
 
     const send = await sendPostToVkWall({
       accessToken: token,
       ownerIdStr: ownerRaw,
-      fromGroup: client.vkFromGroup,
+      fromGroup: acc.vkFromGroup,
       message: payload.caption,
       imageUrls,
       appBaseUrl,
@@ -282,7 +295,7 @@ export async function publishPostNowAction(
         prisma.post.update({
           where: { id: postId },
           data: {
-            clientId: payload.clientId,
+            clientSocialAccountId: payload.socialAccountId,
             postType: payload.postType as PostContentType,
             caption: payload.caption,
             location: payload.location,
@@ -302,14 +315,20 @@ export async function publishPostNowAction(
             title: "Пост опубликован во ВКонтакте",
             detail: payload.caption.trim().slice(0, 200) || undefined,
             postId,
-            clientId: payload.clientId,
+            clientId,
           },
         }),
       ]);
 
-      revalidatePostPaths(userId, postId, payload.clientId);
-      if (existing.clientId !== payload.clientId) {
-        revalidatePath(`/clients/${existing.clientId}`);
+      revalidatePostPaths(userId, postId, clientId);
+      if (existing.clientSocialAccountId !== payload.socialAccountId) {
+        const old = await prisma.clientSocialAccount.findUnique({
+          where: { id: existing.clientSocialAccountId },
+          select: { clientId: true },
+        });
+        if (old && old.clientId !== clientId) {
+          revalidatePath(`/clients/${old.clientId}`);
+        }
       }
       return { ok: true, postId };
     } catch (e) {
@@ -325,11 +344,10 @@ export async function publishPostNowAction(
   return {
     ok: false,
     error:
-      "Мгновенная публикация доступна только для клиентов Telegram и ВКонтакте.",
+      "Мгновенная публикация доступна только для аккаунтов Telegram и ВКонтакте.",
   };
 }
 
-/** Черновик → запланирован; иначе из любого статуса (кроме уже черновика) → черновик. */
 export async function setPostDraftOrScheduledAction(
   postId: string,
   target: "draft" | "scheduled"
@@ -339,8 +357,15 @@ export async function setPostDraftOrScheduledAction(
 
   const existing = await prisma.post.findFirst({
     where: { id: postId, userId },
+    include: { socialAccount: true },
   });
   if (!existing) return { ok: false, error: "Пост не найден." };
+
+  if (existing.status === "published") {
+    return { ok: false, error: "Опубликованный пост нельзя менять." };
+  }
+
+  const clientId = existing.socialAccount.clientId;
 
   if (target === "scheduled") {
     if (existing.status !== "draft") {
@@ -354,7 +379,7 @@ export async function setPostDraftOrScheduledAction(
         where: { id: postId },
         data: { status: "scheduled" },
       });
-      revalidatePostPaths(userId, postId, existing.clientId);
+      revalidatePostPaths(userId, postId, clientId);
       return { ok: true, postId };
     } catch (e) {
       console.error(e);
@@ -370,7 +395,7 @@ export async function setPostDraftOrScheduledAction(
       where: { id: postId },
       data: { status: "draft" },
     });
-    revalidatePostPaths(userId, postId, existing.clientId);
+    revalidatePostPaths(userId, postId, clientId);
     return { ok: true, postId };
   } catch (e) {
     console.error(e);
@@ -384,13 +409,15 @@ export async function deletePostAction(postId: string): Promise<PostActionResult
 
   const existing = await prisma.post.findFirst({
     where: { id: postId, userId },
-    select: { id: true, clientId: true },
+    include: { socialAccount: true },
   });
   if (!existing) return { ok: false, error: "Пост не найден." };
 
+  const clientId = existing.socialAccount.clientId;
+
   try {
     await prisma.post.delete({ where: { id: postId } });
-    revalidatePostPaths(userId, postId, existing.clientId);
+    revalidatePostPaths(userId, postId, clientId);
     return { ok: true };
   } catch (e) {
     console.error(e);
@@ -410,7 +437,7 @@ export async function addPostDiscussionCommentAction(
 
   const post = await prisma.post.findFirst({
     where: { id: postId, userId },
-    select: { id: true, clientId: true },
+    include: { socialAccount: true },
   });
   if (!post) return { ok: false, error: "Пост не найден." };
 
@@ -423,7 +450,7 @@ export async function addPostDiscussionCommentAction(
         createdAt: new Date(),
       },
     });
-    revalidatePostPaths(userId, post.id, post.clientId);
+    revalidatePostPaths(userId, post.id, post.socialAccount.clientId);
     return { ok: true };
   } catch (e) {
     console.error(e);

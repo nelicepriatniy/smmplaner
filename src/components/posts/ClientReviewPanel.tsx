@@ -10,13 +10,13 @@ import { InstagramPostPreview } from "@/components/posts/InstagramPostPreview";
 import { TelegramPostPreview } from "@/components/posts/TelegramPostPreview";
 import { ClientPortalDiscussion } from "@/components/posts/ClientPortalDiscussion";
 import type { PostReviewComment } from "@/components/posts/postReviewTypes";
-import type { ClientRecord } from "@/domain/smm";
+import type { PostPublisherPreview } from "@/domain/smm";
 import type { PostType } from "@/types/postType";
 
 type ClientReviewPanelProps = {
   clientReviewToken: string;
   postType: PostType;
-  client: ClientRecord | null;
+  publisher: PostPublisherPreview | null;
   imageUrls: string[];
   caption: string;
   location: string;
@@ -29,7 +29,7 @@ type ClientReviewPanelProps = {
 export function ClientReviewPanel({
   clientReviewToken,
   postType,
-  client,
+  publisher,
   imageUrls,
   caption,
   location,
@@ -77,16 +77,16 @@ export function ClientReviewPanel({
         className="flex w-full min-w-0 max-w-full justify-center rounded-2xl border border-[#efefef] p-4"
         style={{ background: "#fafafa" }}
       >
-        {client?.platform === "telegram" || client?.platform === "vk" ? (
+        {publisher?.platform === "telegram" || publisher?.platform === "vk" ? (
           <TelegramPostPreview
-            client={client}
+            publisher={publisher}
             imageUrls={imageUrls}
             caption={caption}
           />
         ) : (
           <InstagramPostPreview
             postType={postType}
-            client={client}
+            publisher={publisher}
             imageUrls={imageUrls}
             caption={caption}
             location={location}

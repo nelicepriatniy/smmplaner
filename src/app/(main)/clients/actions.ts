@@ -48,6 +48,117 @@ function parseVkWallFromForm(formData: FormData):
   return { ok: true, vkOwnerId, vkFromGroup };
 }
 
+type SocialCreateInput = {
+  platform: DbClientPlatform;
+  instagramUsername: string;
+  instagramBusinessId: string | null;
+  facebookPageId: string | null;
+  pageAccessToken: string | null;
+  businessAccountConfirmed: boolean;
+  telegramBotToken: string | null;
+  telegramChatId: string | null;
+  vkAccessToken: string | null;
+  vkOwnerId: string | null;
+  vkFromGroup: boolean;
+};
+
+function parseFirstSocialAccountFromForm(
+  formData: FormData,
+  mode: "create" | "update",
+  existingTelegramToken: string | null | undefined,
+  existingVkToken: string | null | undefined
+):
+  | { ok: true; data: SocialCreateInput }
+  | { ok: false; error: string } {
+  const platform = parsePlatform(String(formData.get("platform") ?? "instagram"));
+
+  if (platform === "telegram") {
+    const telegramBotTokenRaw = String(formData.get("telegramBotToken") ?? "").trim();
+    const telegramChatId = String(formData.get("telegramChatId") ?? "").trim() || null;
+    const telegramBotToken =
+      telegramBotTokenRaw ||
+      (mode === "update" && existingTelegramToken?.trim() ? existingTelegramToken : null);
+    if (!telegramBotToken || !telegramChatId) {
+      return { ok: false, error: "Для Telegram укажите токен бота и ID чата." };
+    }
+    return {
+      ok: true,
+      data: {
+        platform: "telegram",
+        instagramUsername: TG_INSTAGRAM_PLACEHOLDER,
+        instagramBusinessId: null,
+        facebookPageId: null,
+        pageAccessToken: null,
+        businessAccountConfirmed: false,
+        telegramBotToken,
+        telegramChatId,
+        vkAccessToken: null,
+        vkOwnerId: null,
+        vkFromGroup: false,
+      },
+    };
+  }
+
+  if (platform === "vk") {
+    const vk = parseVkWallFromForm(formData);
+    if (!vk.ok) return vk;
+    const vkAccessTokenRaw = String(formData.get("vkAccessToken") ?? "").trim();
+    const vkAccessToken =
+      vkAccessTokenRaw ||
+      (mode === "update" && existingVkToken?.trim() ? existingVkToken : null);
+    if (!vkAccessToken) {
+      return { ok: false, error: "Для ВКонтакте укажите access token." };
+    }
+    return {
+      ok: true,
+      data: {
+        platform: "vk",
+        instagramUsername: VK_INSTAGRAM_PLACEHOLDER,
+        instagramBusinessId: null,
+        facebookPageId: null,
+        pageAccessToken: null,
+        businessAccountConfirmed: false,
+        telegramBotToken: null,
+        telegramChatId: null,
+        vkAccessToken,
+        vkOwnerId: vk.vkOwnerId,
+        vkFromGroup: vk.vkFromGroup,
+      },
+    };
+  }
+
+  const instagramUsername = String(formData.get("instagramUsername") ?? "")
+    .trim()
+    .replace(/^@+/, "");
+  if (!instagramUsername) {
+    return { ok: false, error: "Укажите логин Instagram." };
+  }
+  const instagramBusinessId =
+    String(formData.get("instagramBusinessId") ?? "").replace(/\D/g, "") || null;
+  const facebookPageId =
+    String(formData.get("facebookPageId") ?? "").replace(/\D/g, "") || null;
+  const pageAccessTokenRaw = String(formData.get("pageAccessToken") ?? "").trim();
+  const pageAccessToken = pageAccessTokenRaw || null;
+  const businessAccountConfirmed = formData.get("businessAccountConfirmed") === "on";
+
+  return {
+    ok: true,
+    data: {
+      platform: "instagram",
+      instagramUsername,
+      instagramBusinessId,
+      facebookPageId,
+      pageAccessToken,
+      businessAccountConfirmed,
+      telegramBotToken: null,
+      telegramChatId: null,
+      vkAccessToken: null,
+      vkOwnerId: null,
+      vkFromGroup: false,
+    },
+  };
+}
+
 async function requireUserId(): Promise<string | null> {
   const s = await auth();
   return s?.user?.id ?? null;
@@ -59,7 +170,6 @@ export async function createClientAction(
   const userId = await requireUserId();
   if (!userId) return { ok: false, error: "Нужна авторизация." };
 
-  const platform = parsePlatform(String(formData.get("platform") ?? "instagram"));
   const fullName = String(formData.get("fullName") ?? "").trim();
   if (!fullName) {
     return { ok: false, error: "Укажите название." };
@@ -70,105 +180,53 @@ export async function createClientAction(
   );
   const contact = String(formData.get("contact") ?? "").trim() || null;
 
-  let instagramUsername: string;
-  let instagramBusinessId: string | null;
-  let facebookPageId: string | null;
-  let pageAccessToken: string | null;
-  let businessAccountConfirmed: boolean;
-  let telegramBotToken: string | null;
-  let telegramChatId: string | null;
-  let vkAccessToken: string | null;
-  let vkOwnerId: string | null;
-  let vkFromGroup: boolean;
+  const parsed = parseFirstSocialAccountFromForm(formData, "create", null, null);
+  if (!parsed.ok) return parsed;
 
-  if (platform === "telegram") {
-    telegramBotToken = String(formData.get("telegramBotToken") ?? "").trim() || null;
-    telegramChatId = String(formData.get("telegramChatId") ?? "").trim() || null;
-    if (!telegramBotToken || !telegramChatId) {
-      return { ok: false, error: "Для Telegram укажите токен бота и ID чата." };
-    }
-    instagramUsername = TG_INSTAGRAM_PLACEHOLDER;
-    instagramBusinessId = null;
-    facebookPageId = null;
-    pageAccessToken = null;
-    businessAccountConfirmed = false;
-    vkAccessToken = null;
-    vkOwnerId = null;
-    vkFromGroup = false;
-  } else if (platform === "vk") {
-    const vk = parseVkWallFromForm(formData);
-    if (!vk.ok) return { ok: false, error: vk.error };
-    vkAccessToken = String(formData.get("vkAccessToken") ?? "").trim() || null;
-    if (!vkAccessToken) {
-      return { ok: false, error: "Для ВКонтакте укажите access token." };
-    }
-    vkOwnerId = vk.vkOwnerId;
-    vkFromGroup = vk.vkFromGroup;
-    instagramUsername = VK_INSTAGRAM_PLACEHOLDER;
-    instagramBusinessId = null;
-    facebookPageId = null;
-    pageAccessToken = null;
-    businessAccountConfirmed = false;
-    telegramBotToken = null;
-    telegramChatId = null;
-  } else {
-    instagramUsername = String(formData.get("instagramUsername") ?? "")
-      .trim()
-      .replace(/^@+/, "");
-    if (!instagramUsername) {
-      return { ok: false, error: "Укажите название и логин Instagram." };
-    }
-    instagramBusinessId =
-      String(formData.get("instagramBusinessId") ?? "").replace(/\D/g, "") || null;
-    facebookPageId =
-      String(formData.get("facebookPageId") ?? "").replace(/\D/g, "") || null;
-    const pageAccessTokenRaw = String(formData.get("pageAccessToken") ?? "").trim();
-    pageAccessToken = pageAccessTokenRaw || null;
-    businessAccountConfirmed = formData.get("businessAccountConfirmed") === "on";
-    telegramBotToken = null;
-    telegramChatId = null;
-    vkAccessToken = null;
-    vkOwnerId = null;
-    vkFromGroup = false;
-  }
-
+  const s = parsed.data;
   const activityDetail =
-    platform === "telegram"
-      ? `${fullName} (Telegram, чат ${telegramChatId})`
-      : platform === "vk"
-        ? `${fullName} (ВКонтакте, стена ${vkOwnerId})`
-        : `${fullName} (@${instagramUsername})`;
+    s.platform === "telegram"
+      ? `${fullName} (Telegram, чат ${s.telegramChatId})`
+      : s.platform === "vk"
+        ? `${fullName} (ВКонтакте, стена ${s.vkOwnerId})`
+        : `${fullName} (@${s.instagramUsername})`;
 
   try {
-    const client = await prisma.client.create({
-      data: {
-        userId,
-        fullName,
-        platform,
-        instagramUsername,
-        activitySpheres,
-        contact,
-        instagramBusinessId,
-        facebookPageId,
-        pageAccessToken,
-        businessAccountConfirmed,
-        telegramBotToken,
-        telegramChatId,
-        vkAccessToken,
-        vkOwnerId,
-        vkFromGroup,
-      },
-    });
-
-    await prisma.activity.create({
-      data: {
-        userId,
-        kind: "client_added",
-        createdAt: new Date(),
-        title: "Добавлен новый клиент",
-        detail: activityDetail,
-        clientId: client.id,
-      },
+    await prisma.$transaction(async (tx) => {
+      const client = await tx.client.create({
+        data: {
+          userId,
+          fullName,
+          activitySpheres,
+          contact,
+        },
+      });
+      await tx.clientSocialAccount.create({
+        data: {
+          clientId: client.id,
+          platform: s.platform,
+          instagramUsername: s.instagramUsername,
+          instagramBusinessId: s.instagramBusinessId,
+          facebookPageId: s.facebookPageId,
+          pageAccessToken: s.pageAccessToken,
+          businessAccountConfirmed: s.businessAccountConfirmed,
+          telegramBotToken: s.telegramBotToken,
+          telegramChatId: s.telegramChatId,
+          vkAccessToken: s.vkAccessToken,
+          vkOwnerId: s.vkOwnerId,
+          vkFromGroup: s.vkFromGroup,
+        },
+      });
+      await tx.activity.create({
+        data: {
+          userId,
+          kind: "client_added",
+          createdAt: new Date(),
+          title: "Добавлен новый клиент",
+          detail: activityDetail,
+          clientId: client.id,
+        },
+      });
     });
 
     revalidatePath("/clients");
@@ -182,6 +240,7 @@ export async function createClientAction(
   }
 }
 
+/** Только имя, сферы и контакт клиента (соцсети — отдельно на карточке). */
 export async function updateClientAction(
   clientId: string,
   formData: FormData
@@ -194,7 +253,6 @@ export async function updateClientAction(
   });
   if (!existing) return { ok: false, error: "Клиент не найден." };
 
-  const platform = parsePlatform(String(formData.get("platform") ?? "instagram"));
   const fullName = String(formData.get("fullName") ?? "").trim();
   if (!fullName) {
     return { ok: false, error: "Укажите название." };
@@ -205,106 +263,14 @@ export async function updateClientAction(
   );
   const contact = String(formData.get("contact") ?? "").trim() || null;
 
-  let instagramUsername: string;
-  let instagramBusinessId: string | null;
-  let facebookPageId: string | null;
-  let businessAccountConfirmed: boolean;
-  let telegramChatId: string | null;
-
-  if (platform === "telegram") {
-    telegramChatId = String(formData.get("telegramChatId") ?? "").trim() || null;
-    if (!telegramChatId) {
-      return { ok: false, error: "Для Telegram укажите ID чата." };
-    }
-    instagramUsername =
-      existing.platform === "telegram"
-        ? existing.instagramUsername
-        : TG_INSTAGRAM_PLACEHOLDER;
-    instagramBusinessId = null;
-    facebookPageId = null;
-    businessAccountConfirmed = false;
-  } else if (platform === "vk") {
-    const vk = parseVkWallFromForm(formData);
-    if (!vk.ok) return { ok: false, error: vk.error };
-    telegramChatId = null;
-    instagramUsername =
-      existing.platform === "vk" ? existing.instagramUsername : VK_INSTAGRAM_PLACEHOLDER;
-    instagramBusinessId = null;
-    facebookPageId = null;
-    businessAccountConfirmed = false;
-  } else {
-    instagramUsername = String(formData.get("instagramUsername") ?? "")
-      .trim()
-      .replace(/^@+/, "");
-    if (!instagramUsername) {
-      return { ok: false, error: "Укажите название и логин Instagram." };
-    }
-    instagramBusinessId =
-      String(formData.get("instagramBusinessId") ?? "").replace(/\D/g, "") || null;
-    facebookPageId =
-      String(formData.get("facebookPageId") ?? "").replace(/\D/g, "") || null;
-    businessAccountConfirmed = formData.get("businessAccountConfirmed") === "on";
-    telegramChatId = null;
-  }
-
-  const pageAccessTokenRaw = String(formData.get("pageAccessToken") ?? "").trim();
-  const telegramBotTokenRaw = String(formData.get("telegramBotToken") ?? "").trim();
-  const vkAccessTokenRaw = String(formData.get("vkAccessToken") ?? "").trim();
-
-  const data: Prisma.ClientUpdateInput = {
-    fullName,
-    platform,
-    instagramUsername,
-    activitySpheres,
-    contact,
-    instagramBusinessId,
-    facebookPageId,
-    businessAccountConfirmed,
-    telegramChatId,
-  };
-
-  if (platform === "instagram") {
-    if (pageAccessTokenRaw) {
-      data.pageAccessToken = pageAccessTokenRaw;
-    }
-    data.telegramBotToken = null;
-    data.vkAccessToken = null;
-    data.vkOwnerId = null;
-    data.vkFromGroup = false;
-  } else if (platform === "telegram") {
-    data.pageAccessToken = null;
-    data.vkAccessToken = null;
-    data.vkOwnerId = null;
-    data.vkFromGroup = false;
-    if (telegramBotTokenRaw) {
-      data.telegramBotToken = telegramBotTokenRaw;
-    } else if (!existing.telegramBotToken?.trim()) {
-      return {
-        ok: false,
-        error: "Укажите токен бота от @BotFather.",
-      };
-    }
-  } else {
-    const vk = parseVkWallFromForm(formData);
-    if (!vk.ok) return { ok: false, error: vk.error };
-    data.pageAccessToken = null;
-    data.telegramBotToken = null;
-    data.vkOwnerId = vk.vkOwnerId;
-    data.vkFromGroup = vk.vkFromGroup;
-    if (vkAccessTokenRaw) {
-      data.vkAccessToken = vkAccessTokenRaw;
-    } else if (!existing.vkAccessToken?.trim()) {
-      return {
-        ok: false,
-        error: "Укажите access token ВКонтакте.",
-      };
-    }
-  }
-
   try {
     await prisma.client.update({
       where: { id: clientId },
-      data,
+      data: {
+        fullName,
+        activitySpheres,
+        contact,
+      },
     });
     revalidatePath("/clients");
     revalidatePath(`/clients/${clientId}`);
@@ -315,6 +281,153 @@ export async function updateClientAction(
   } catch (e) {
     console.error(e);
     return { ok: false, error: "Не удалось обновить клиента." };
+  }
+}
+
+export async function addClientSocialAccountAction(
+  clientId: string,
+  formData: FormData
+): Promise<ClientActionResult> {
+  const userId = await requireUserId();
+  if (!userId) return { ok: false, error: "Нужна авторизация." };
+
+  const client = await prisma.client.findFirst({
+    where: { id: clientId, userId },
+  });
+  if (!client) return { ok: false, error: "Клиент не найден." };
+
+  const parsed = parseFirstSocialAccountFromForm(formData, "create", null, null);
+  if (!parsed.ok) return parsed;
+  const s = parsed.data;
+
+  try {
+    await prisma.clientSocialAccount.create({
+      data: {
+        clientId,
+        platform: s.platform,
+        instagramUsername: s.instagramUsername,
+        instagramBusinessId: s.instagramBusinessId,
+        facebookPageId: s.facebookPageId,
+        pageAccessToken: s.pageAccessToken,
+        businessAccountConfirmed: s.businessAccountConfirmed,
+        telegramBotToken: s.telegramBotToken,
+        telegramChatId: s.telegramChatId,
+        vkAccessToken: s.vkAccessToken,
+        vkOwnerId: s.vkOwnerId,
+        vkFromGroup: s.vkFromGroup,
+      },
+    });
+    revalidatePath("/clients");
+    revalidatePath(`/clients/${clientId}`);
+    revalidatePath("/posts/new");
+    return { ok: true };
+  } catch (e) {
+    console.error(e);
+    return { ok: false, error: "Не удалось добавить соцсеть." };
+  }
+}
+
+export async function updateClientSocialAccountAction(
+  socialAccountId: string,
+  formData: FormData
+): Promise<ClientActionResult> {
+  const userId = await requireUserId();
+  if (!userId) return { ok: false, error: "Нужна авторизация." };
+
+  const existing = await prisma.clientSocialAccount.findFirst({
+    where: { id: socialAccountId, client: { userId } },
+  });
+  if (!existing) return { ok: false, error: "Аккаунт не найден." };
+
+  const platform = existing.platform;
+  const data: Prisma.ClientSocialAccountUpdateInput = {};
+
+  if (platform === "instagram") {
+    const instagramUsername = String(formData.get("instagramUsername") ?? "")
+      .trim()
+      .replace(/^@+/, "");
+    if (!instagramUsername) {
+      return { ok: false, error: "Укажите логин Instagram." };
+    }
+    data.instagramUsername = instagramUsername;
+    data.instagramBusinessId =
+      String(formData.get("instagramBusinessId") ?? "").replace(/\D/g, "") || null;
+    data.facebookPageId =
+      String(formData.get("facebookPageId") ?? "").replace(/\D/g, "") || null;
+    data.businessAccountConfirmed = formData.get("businessAccountConfirmed") === "on";
+    const pageAccessTokenRaw = String(formData.get("pageAccessToken") ?? "").trim();
+    if (pageAccessTokenRaw) {
+      data.pageAccessToken = pageAccessTokenRaw;
+    }
+  } else if (platform === "telegram") {
+    const telegramChatId = String(formData.get("telegramChatId") ?? "").trim() || null;
+    if (!telegramChatId) {
+      return { ok: false, error: "Для Telegram укажите ID чата." };
+    }
+    data.telegramChatId = telegramChatId;
+    const telegramBotTokenRaw = String(formData.get("telegramBotToken") ?? "").trim();
+    if (telegramBotTokenRaw) {
+      data.telegramBotToken = telegramBotTokenRaw;
+    } else if (!existing.telegramBotToken?.trim()) {
+      return { ok: false, error: "Укажите токен бота от @BotFather." };
+    }
+  } else {
+    const vk = parseVkWallFromForm(formData);
+    if (!vk.ok) return vk;
+    data.vkOwnerId = vk.vkOwnerId;
+    data.vkFromGroup = vk.vkFromGroup;
+    const vkAccessTokenRaw = String(formData.get("vkAccessToken") ?? "").trim();
+    if (vkAccessTokenRaw) {
+      data.vkAccessToken = vkAccessTokenRaw;
+    } else if (!existing.vkAccessToken?.trim()) {
+      return { ok: false, error: "Укажите access token ВКонтакте." };
+    }
+  }
+
+  try {
+    await prisma.clientSocialAccount.update({
+      where: { id: socialAccountId },
+      data,
+    });
+    const clientId = existing.clientId;
+    revalidatePath("/clients");
+    revalidatePath(`/clients/${clientId}`);
+    revalidatePath("/posts/new");
+    return { ok: true };
+  } catch (e) {
+    console.error(e);
+    return { ok: false, error: "Не удалось обновить соцсеть." };
+  }
+}
+
+export async function deleteClientSocialAccountAction(
+  socialAccountId: string
+): Promise<ClientActionResult> {
+  const userId = await requireUserId();
+  if (!userId) return { ok: false, error: "Нужна авторизация." };
+
+  const existing = await prisma.clientSocialAccount.findFirst({
+    where: { id: socialAccountId, client: { userId } },
+    include: { _count: { select: { posts: true } } },
+  });
+  if (!existing) return { ok: false, error: "Аккаунт не найден." };
+  if (existing._count.posts > 0) {
+    return {
+      ok: false,
+      error: "Нельзя удалить соцсеть, к которой привязаны посты.",
+    };
+  }
+
+  const clientId = existing.clientId;
+  try {
+    await prisma.clientSocialAccount.delete({ where: { id: socialAccountId } });
+    revalidatePath("/clients");
+    revalidatePath(`/clients/${clientId}`);
+    revalidatePath("/posts/new");
+    return { ok: true };
+  } catch (e) {
+    console.error(e);
+    return { ok: false, error: "Не удалось удалить соцсеть." };
   }
 }
 
@@ -331,7 +444,7 @@ export async function deleteClientAction(
   if (!existing) return { ok: false, error: "Клиент не найден." };
 
   const postRows = await prisma.post.findMany({
-    where: { clientId, userId },
+    where: { userId, socialAccount: { clientId } },
     select: { id: true },
   });
 
