@@ -1,21 +1,35 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import type { ClientRecord } from "@/data/mockDb";
-
-const btnEditClass =
-  "mt-5 w-full rounded-xl border border-[var(--border)] py-2.5 text-[13px] font-medium text-[var(--foreground)] transition-colors hover:border-[color-mix(in_srgb,var(--accent)_35%,var(--border))] hover:bg-[var(--surface-elevated)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]";
 
 type ClientCardProps = {
   client: ClientRecord;
-  onEdit: () => void;
 };
 
-export function ClientCard({ client, onEdit }: ClientCardProps) {
+export function ClientCard({ client }: ClientCardProps) {
+  const router = useRouter();
   const ig = client.instagramUsername;
   const igUrl = `https://www.instagram.com/${encodeURIComponent(ig)}/`;
 
+  const goToClient = () => {
+    router.push(`/clients/${client.id}`);
+  };
+
   return (
-    <article className="flex flex-col rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-5 transition-colors hover:border-[color-mix(in_srgb,var(--accent)_28%,var(--border))]">
+    <article
+      className="flex h-full flex-col cursor-pointer rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-5 transition-colors hover:border-[color-mix(in_srgb,var(--accent)_28%,var(--border))] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+      role="link"
+      tabIndex={0}
+      aria-label={`${client.fullName}, подробности`}
+      onClick={goToClient}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          goToClient();
+        }
+      }}
+    >
       <h2 className="text-[16px] font-semibold leading-snug text-[var(--foreground)]">
         {client.fullName}
       </h2>
@@ -23,6 +37,8 @@ export function ClientCard({ client, onEdit }: ClientCardProps) {
         href={igUrl}
         target="_blank"
         rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
         className="mt-1.5 inline-flex w-fit text-[13px] text-[var(--muted)] underline-offset-2 transition-colors hover:text-[var(--accent)] hover:underline"
       >
         @{ig}
@@ -71,10 +87,6 @@ export function ClientCard({ client, onEdit }: ClientCardProps) {
           </li>
         ))}
       </ul>
-
-      <button type="button" onClick={onEdit} className={btnEditClass}>
-        Редактирование клиента
-      </button>
     </article>
   );
 }

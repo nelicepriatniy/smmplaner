@@ -4,7 +4,6 @@ import { useCallback, useState } from "react";
 import { ClientFormDialog } from "@/components/clients/ClientFormDialog";
 import { ClientCard } from "@/components/clients/ClientCard";
 import { mockClients } from "@/data/mockDb";
-import type { ClientRecord } from "@/data/mockDb";
 
 const btnPrimaryClass =
   "inline-flex items-center justify-center rounded-xl border border-transparent bg-[var(--surface-elevated)] px-4 py-2.5 text-[14px] font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--border)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]";
@@ -21,26 +20,14 @@ export function ClientsView() {
   const n = mockClients.length;
   const [formOpen, setFormOpen] = useState(false);
   const [formSession, setFormSession] = useState(0);
-  const [formMode, setFormMode] = useState<"add" | "edit">("add");
-  const [editingClient, setEditingClient] = useState<ClientRecord | null>(null);
 
   const openAdd = () => {
-    setFormMode("add");
-    setEditingClient(null);
-    setFormSession((s) => s + 1);
-    setFormOpen(true);
-  };
-
-  const openEdit = (client: ClientRecord) => {
-    setFormMode("edit");
-    setEditingClient(client);
     setFormSession((s) => s + 1);
     setFormOpen(true);
   };
 
   const closeForm = useCallback(() => {
     setFormOpen(false);
-    setEditingClient(null);
   }, []);
 
   return (
@@ -48,8 +35,8 @@ export function ClientsView() {
       <ClientFormDialog
         isOpen={formOpen}
         onRequestClose={closeForm}
-        mode={formMode}
-        client={editingClient}
+        mode="add"
+        client={null}
         session={formSession}
       />
 
@@ -71,7 +58,7 @@ export function ClientsView() {
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
         {mockClients.map((c) => (
-          <ClientCard key={c.id} client={c} onEdit={() => openEdit(c)} />
+          <ClientCard key={c.id} client={c} />
         ))}
       </div>
     </main>

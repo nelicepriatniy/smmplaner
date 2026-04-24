@@ -19,29 +19,66 @@ import {
 type NewPostEditorProps = {
   /** Если задано — форма открывается с данными черновика (страница редактирования). */
   initialValues?: PostEditorInitialValues | null;
+  /**
+   * Для новой записи: предвыбрать клиента (например `?client=` в URL).
+   * Не влияет, если задано `initialValues` (редактирование).
+   */
+  initialClientId?: string;
+  /**
+   * Копия существующего поста: те же поля, но сценарий «новый» (расписание в URL уже нормализовано).
+   * Не задаёт `isEditMode`.
+   */
+  duplicateFrom?: PostEditorInitialValues | null;
 };
 
-export function NewPostEditor({ initialValues = null }: NewPostEditorProps) {
-  const isEditMode = initialValues != null;
+function defaultClientId(
+  initialValues: PostEditorInitialValues | null,
+  duplicateFrom: PostEditorInitialValues | null,
+  fromQuery: string | undefined
+) {
+  if (initialValues?.clientId) return initialValues.clientId;
+  if (duplicateFrom?.clientId) return duplicateFrom.clientId;
+  if (fromQuery && mockClients.some((c) => c.id === fromQuery)) {
+    return fromQuery;
+  }
+  return mockClients[0]?.id ?? "";
+}
 
-  const [clientId, setClientId] = useState(
-    () => initialValues?.clientId ?? mockClients[0]?.id ?? ""
+function seedForNew(
+  initialValues: PostEditorInitialValues | null,
+  duplicateFrom: PostEditorInitialValues | null
+): PostEditorInitialValues | null {
+  if (initialValues) return initialValues;
+  if (duplicateFrom) return duplicateFrom;
+  return null;
+}
+
+export function NewPostEditor({
+  initialValues = null,
+  initialClientId,
+  duplicateFrom = null,
+}: NewPostEditorProps) {
+  const isEditMode = initialValues != null;
+  const seed = seedForNew(initialValues, duplicateFrom);
+
+  const [clientId, setClientId] = useState(() =>
+    defaultClientId(initialValues, duplicateFrom, initialClientId)
   );
   const [postType, setPostType] = useState<PostType>(
-    () => initialValues?.postType ?? "feed"
+    () => seed?.postType ?? "feed"
   );
-  const [caption, setCaption] = useState(() => initialValues?.caption ?? "");
-  const [location, setLocation] = useState(() => initialValues?.location ?? "");
+  const [caption, setCaption] = useState(() => seed?.caption ?? "");
+  const [location, setLocation] = useState(() => seed?.location ?? "");
   const [firstComment, setFirstComment] = useState(
-    () => initialValues?.firstComment ?? ""
+    () => seed?.firstComment ?? ""
   );
-  const [altText, setAltText] = useState(() => initialValues?.altText ?? "");
+  const [altText, setAltText] = useState(() => seed?.altText ?? "");
   const [imageUrls, setImageUrls] = useState<string[]>(
-    () => (initialValues?.imageUrls ? [...initialValues.imageUrls] : [])
+    () => (seed?.imageUrls ? [...seed.imageUrls] : [])
   );
   const [publishSchedule, setPublishSchedule] = useState(() =>
-    initialValues
-      ? { date: initialValues.publishDate, time: initialValues.publishTime }
+    seed
+      ? { date: seed.publishDate, time: seed.publishTime }
       : normalizePublishSchedule(getDefaultPublishSchedule())
   );
   /** сбрасываем раз в минуту, чтобы `min` у даты/времени оставались валидны */
@@ -273,10 +310,22 @@ export function NewPostEditor({ initialValues = null }: NewPostEditorProps) {
           </div>
         </div>
 
-        <div className="mt-8 flex flex-wrap gap-3">
+        <div className="mt-8 flex flex-row flex-wrap items-center gap-3">
+          {isEditMode ? (
+            <button
+              type="button"
+              className="rounded-xl bg-[var(--accent)] px-5 py-2.5 text-[14px] font-semibold text-[#0e1016] transition-opacity hover:opacity-90"
+            >
+              Сохранить
+            </button>
+          ) : null}
           <button
             type="button"
-            className="rounded-xl bg-[var(--accent)] px-5 py-2.5 text-[14px] font-semibold text-[#0e1016] transition-opacity hover:opacity-90"
+            className={
+              isEditMode
+                ? "rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] px-5 py-2.5 text-[14px] font-medium text-[var(--foreground)] transition-opacity hover:opacity-90"
+                : "rounded-xl bg-[var(--accent)] px-5 py-2.5 text-[14px] font-semibold text-[#0e1016] transition-opacity hover:opacity-90"
+            }
           >
             Сохранить в черновики
           </button>

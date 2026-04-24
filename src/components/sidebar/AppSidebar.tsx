@@ -7,6 +7,7 @@ import { LogoMark } from "@/components/header/LogoMark";
 const mainNav = [
   { href: "/", label: "Дашборд" },
   { href: "/clients", label: "Клиенты" },
+  { href: "/calendar", label: "Календарь" },
 ] as const;
 
 const contentNav = [

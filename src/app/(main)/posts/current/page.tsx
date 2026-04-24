@@ -51,6 +51,10 @@ function statusBadgeClass(status: PostDraftStatus) {
       return `${base} bg-[var(--accent-soft)] text-[var(--foreground)] ring-1 ring-[color-mix(in_srgb,var(--accent)_40%,var(--border))]`;
     case "scheduled":
       return `${base} bg-[color-mix(in_srgb,var(--accent)_18%,var(--surface-elevated))] text-[var(--foreground)] ring-1 ring-[var(--accent-soft)]`;
+    case "published":
+      return `${base} bg-[color-mix(in_srgb,#5aab7a_22%,var(--surface-elevated))] text-[var(--foreground)] ring-1 ring-[color-mix(in_srgb,#5aab7a_45%,var(--border))]`;
+    case "rejected":
+      return `${base} bg-[color-mix(in_srgb,#c85858_20%,var(--surface-elevated))] text-[var(--foreground)] ring-1 ring-[color-mix(in_srgb,#c85858_50%,var(--border))]`;
     default: {
       const _exhaustive: never = status;
       return _exhaustive;
@@ -221,6 +225,12 @@ export default async function CurrentPostsPage({ searchParams }: PageProps) {
                       className="text-[13px] font-medium text-[var(--accent)] underline-offset-2 hover:underline"
                     >
                       Редактировать
+                    </Link>
+                    <Link
+                      href={`/posts/new?duplicateFrom=${encodeURIComponent(post.id)}`}
+                      className="text-[13px] font-medium text-[var(--accent)] underline-offset-2 hover:underline"
+                    >
+                      Дублировать пост
                     </Link>
                     <Link
                       href={`/posts/${post.id}/discussion`}

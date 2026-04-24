@@ -94,13 +94,24 @@ export const mockClients: ClientRecord[] = [
   },
 ];
 
+export function getClientById(id: string): ClientRecord | undefined {
+  return mockClients.find((c) => c.id === id);
+}
+
 /** Состояние поста в пайплайне (как в БД). */
-export type PostDraftStatus = "draft" | "in_review" | "scheduled";
+export type PostDraftStatus =
+  | "draft"
+  | "in_review"
+  | "scheduled"
+  | "published"
+  | "rejected";
 
 export const POST_DRAFT_STATUS_LABELS: Record<PostDraftStatus, string> = {
   draft: "Черновик",
   in_review: "На рассмотрении",
   scheduled: "Ждёт публикации",
+  published: "Опубликован",
+  rejected: "Отклонён",
 };
 
 /** Черновик / запланированный пост — как в форме «Новый пост» (клиент, тип, подпись, план). */
@@ -604,7 +615,72 @@ export const mockPostDrafts: PostDraftRecord[] = [
     publishTime: "09:00",
     createdAt: "2026-04-24T16:05:00+03:00",
   },
+  {
+    id: "p23",
+    clientId: "c2",
+    clientReviewToken:
+      "smmrv_23f1a2b3c4d5e6f70809101112131415161718191a1b1c1d1e1f2021224343",
+    status: "published",
+    postType: "feed",
+    caption:
+      "Понедельник без кофе не начинаем: фильтр Кения + печенье с шоколадом — до 12:00 скидка 10%.\n" +
+      "#brewcorner #спб",
+    location: "Brew Corner",
+    firstComment: "",
+    altText: "Чашка фильтр-кофе и печенье на блюдце",
+    imageUrls: [
+      "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=800&q=80",
+    ],
+    publishDate: "2026-04-22",
+    publishTime: "10:00",
+    createdAt: "2026-04-21T08:00:00+03:00",
+  },
+  {
+    id: "p24",
+    clientId: "c1",
+    clientReviewToken:
+      "smmrv_24f1a2b3c4d5e6f70809101112131415161718191a1b1c1d1e1f2021224444",
+    status: "published",
+    postType: "photo",
+    caption:
+      "Результат недели: барьер + лёгкий пилинг — кожа ровнее, без агрессии. Спасибо, что доверяете процессу.\n" +
+      "#косметология #результат",
+    location: "",
+    firstComment: "",
+    altText: "Спокойный портрет у окна, мягкий дневной свет",
+    imageUrls: [
+      "https://images.unsplash.com/photo-1616394584738-fc6e612e71b1?w=800&q=80",
+    ],
+    publishDate: "2026-04-24",
+    publishTime: "09:30",
+    createdAt: "2026-04-23T17:00:00+03:00",
+  },
+  {
+    id: "p25",
+    clientId: "c4",
+    clientReviewToken:
+      "smmrv_25f1a2b3c4d5e6f70809101112131415161718191a1b1c1d1e1f2021224545",
+    status: "rejected",
+    postType: "reels",
+    caption:
+      "Тур по шоуруму: быстрый монтаж под музыку — клиент просил «как у конкурентов», но стиль не совпал с брендом.",
+    location: "",
+    firstComment: "",
+    altText: "Интерьер шоурума, проход камеры по комнатам",
+    imageUrls: [
+      "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=800&q=80",
+    ],
+    publishDate: "2026-04-23",
+    publishTime: "15:00",
+    createdAt: "2026-04-22T14:00:00+03:00",
+  },
 ];
+
+export function getPostDraftsByClientId(
+  clientId: string
+): PostDraftRecord[] {
+  return mockPostDrafts.filter((p) => p.clientId === clientId);
+}
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

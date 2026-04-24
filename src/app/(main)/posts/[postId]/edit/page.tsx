@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { NewPostEditor } from "@/components/posts/NewPostEditor";
 import { getMockPostDraftById, postDraftToEditorInitial } from "@/data/mockDb";
@@ -28,9 +29,17 @@ export default async function EditPostPage({ params }: PageProps) {
   return (
     <main className="w-full py-8 sm:py-10">
       <header className="mb-2">
-        <h1 className="text-[22px] font-semibold tracking-tight text-[var(--foreground)] sm:text-[24px]">
-          Редактирование
-        </h1>
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
+          <h1 className="text-[22px] font-semibold tracking-tight text-[var(--foreground)] sm:text-[24px]">
+            Редактирование
+          </h1>
+          <Link
+            href={`/posts/new?duplicateFrom=${encodeURIComponent(postId)}`}
+            className="shrink-0 text-[13px] font-medium text-[var(--accent)] underline-offset-2 hover:underline"
+          >
+            Дублировать пост
+          </Link>
+        </div>
         <p className="mt-1.5 text-[14px] text-[var(--muted)]">
           Те же поля и предпросмотр, что в «Новом посте» — данные подставлены из
           черновика.

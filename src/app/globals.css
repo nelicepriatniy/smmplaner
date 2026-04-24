@@ -15,6 +15,12 @@
   --border: color-mix(in srgb, #c4b8dc 12%, transparent);
   --accent: #b4c5e8;
   --accent-soft: color-mix(in srgb, var(--accent) 22%, transparent);
+  /* Обводка карточек поста в календаре */
+  --post-status-draft-border: #6a6f7a;
+  --post-status-in-review-border: #c4a060;
+  --post-status-scheduled-border: color-mix(in srgb, var(--accent) 70%, #7a9bd4);
+  --post-status-published-border: #5aab7a;
+  --post-status-rejected-border: #c85858;
 }
 
 html {
