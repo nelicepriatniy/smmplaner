@@ -13,6 +13,7 @@ import {
   createClientAction,
   updateClientAction,
 } from "@/app/(main)/clients/actions";
+import { VkIdTokenButton } from "@/components/clients/VkIdTokenButton";
 
 const inputClass =
   "w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3.5 py-2.5 text-[15px] text-[var(--foreground)] outline-offset-2 focus:border-[color-mix(in_srgb,var(--accent)_50%,var(--border))] focus:ring-2 focus:ring-[var(--accent-soft)]";
@@ -548,6 +549,15 @@ function ClientFormBody({ mode, client, onDismiss, onSaved }: ClientFormBodyProp
                   </label>
                 </div>
               ) : null}
+
+              <VkIdTokenButton
+                disabled={isPending}
+                onAccessToken={(token) => {
+                  setField("vkAccessToken", token);
+                  setStatus("idle");
+                  setErrorMessage("");
+                }}
+              />
 
               <div>
                 <label
