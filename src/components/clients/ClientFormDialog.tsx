@@ -268,6 +268,13 @@ function ClientFormBody({ mode, client, onDismiss, onSaved }: ClientFormBodyProp
                 в <code className="rounded bg-[var(--background)] px-1">.env</code> /{" "}
                 <code className="rounded bg-[var(--background)] px-1">.env.local</code>, затем
                 перезапуск <code className="rounded bg-[var(--background)] px-1">npm run dev</code>.
+                Для публикации постов во ВК у токена должны быть права API{" "}
+                <code className="rounded bg-[var(--background)] px-1">wall</code>,{" "}
+                <code className="rounded bg-[var(--background)] px-1">photos</code> (и при необходимости{" "}
+                <code className="rounded bg-[var(--background)] px-1">groups</code>): включите их в
+                кабинете приложения VK ID → «Доступы», задайте{" "}
+                <code className="rounded bg-[var(--background)] px-1">NEXT_PUBLIC_VK_SCOPE</code> и
+                войдите через кнопку снова. Иначе api.vk.com ответит «Access denied… [15]».
               </p>
               <VkIdTokenButton
                 disabled={isPending}

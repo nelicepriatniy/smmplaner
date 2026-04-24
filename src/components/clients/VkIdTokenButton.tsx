@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 
-const DEFAULT_SCOPE = "wall,photos,offline";
+/** Права для api.vk.com: стена, фото, сообщества (для поста от имени группы), долгоживущий токен. */
+const DEFAULT_SCOPE = "wall,photos,groups,offline";
 
 /** Как в @vkid/sdk `getCookie` — читаем PKCE после LOGIN_SUCCESS. */
 function readVkidSdkCookie(name: string): string | undefined {
@@ -90,6 +91,7 @@ type VkIdTokenButtonProps = {
 /**
  * Виджет VK ID One Tap: после входа обменивает code на access_token и передаёт в форму.
  * Нужны `NEXT_PUBLIC_VK_APP_ID` и `NEXT_PUBLIC_VK_REDIRECT_URL` (как в настройках приложения VK).
+ * Для `wall.post` в кабинете VK ID должны быть разрешены доступы к API (см. `NEXT_PUBLIC_VK_SCOPE`).
  */
 export function VkIdTokenButton({ onAccessToken, disabled }: VkIdTokenButtonProps) {
   const containerRef = useRef<HTMLDivElement>(null);
