@@ -1,0 +1,84 @@
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Montserrat", ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  --background: #12141a;
+  --foreground: #e9e6f0;
+  --muted: #8c8898;
+  --surface: #181b24;
+  --surface-elevated: #1f232e;
+  --header-bg: #14161d;
+  --border: color-mix(in srgb, #c4b8dc 12%, transparent);
+  --accent: #b4c5e8;
+  --accent-soft: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+html {
+  color-scheme: dark;
+  font-family: "Montserrat", ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  min-height: 100dvh;
+  font-family: inherit;
+  letter-spacing: 0.01em;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--foreground);
+}
+
+@layer base {
+  select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    min-width: 0;
+    font: inherit;
+    font-size: 0.9375rem;
+    line-height: 1.45;
+    letter-spacing: 0.01em;
+    color: var(--foreground);
+    background-color: var(--background);
+    /* Chevron, muted; matches inputs */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%238c8898' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' aria-hidden='true'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 1.25rem 1.25rem;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    padding: 0.625rem 2.75rem 0.625rem 0.875rem;
+    cursor: pointer;
+    outline-offset: 2px;
+    transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  }
+
+  select:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--foreground) 8%, var(--border));
+  }
+
+  select:focus-visible {
+    border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+    box-shadow: 0 0 0 2px var(--accent-soft);
+    outline: none;
+  }
+
+  select:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
+  option,
+  optgroup {
+    background: var(--surface-elevated);
+    color: var(--foreground);
+  }
+}
