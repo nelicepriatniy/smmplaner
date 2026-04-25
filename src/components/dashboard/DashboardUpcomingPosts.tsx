@@ -8,6 +8,10 @@ import {
   type PostDraftStatus,
 } from "@/domain/smm";
 import { POST_TYPE_OPTIONS } from "@/types/postType";
+import {
+  formatPublishScheduleLabelRu,
+  publishScheduleToIsoString,
+} from "@/lib/schedule-display";
 
 /** Карточка «скоро в публикации» — тот же визуальный язык, что у `post_scheduled` в недавней активности. */
 const UPCOMING_CARD_SHELL =
@@ -40,19 +44,8 @@ function statusBadgeClass(status: PostDraftStatus) {
   }
 }
 
-function scheduledAtIso(date: string, time: string) {
-  return `${date}T${time.length === 5 ? `${time}:00` : time}`;
-}
-
 function formatScheduledRu(date: string, time: string) {
-  const d = new Date(scheduledAtIso(date, time));
-  return new Intl.DateTimeFormat("ru-RU", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(d);
+  return formatPublishScheduleLabelRu(date, time);
 }
 
 function postTypeLabel(value: PostDraftRecord["postType"]) {
@@ -145,7 +138,7 @@ export function DashboardUpcomingPosts({
                         </span>
                         <time
                           className="text-[12px] tabular-nums text-[var(--muted)]"
-                          dateTime={scheduledAtIso(
+                          dateTime={publishScheduleToIsoString(
                             post.publishDate,
                             post.publishTime,
                           )}

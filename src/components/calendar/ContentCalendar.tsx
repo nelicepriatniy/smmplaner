@@ -5,8 +5,6 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
 import { useCallback, useLayoutEffect, useMemo, useState } from "react";
 import {
-  postCalendarShortHandle,
-  POST_DRAFT_STATUS_LABELS,
   type ClientRecord,
   type PostDraftRecord,
   type PostDraftStatus,
@@ -28,13 +26,6 @@ const BORDER_BY_STATUS: Record<PostDraftStatus, string> = {
   scheduled: "var(--post-status-scheduled-border)",
   published: "var(--post-status-published-border)",
   rejected: "var(--post-status-rejected-border)",
-};
-
-const POST_TYPE_ABBR: Record<PostDraftRecord["postType"], string> = {
-  feed: "Лента",
-  photo: "Фото",
-  reels: "Рилс",
-  stories: "Сторис",
 };
 
 const viewToggleClass =
@@ -196,11 +187,6 @@ export function ContentCalendar({
     setDayInMonth(ns.day);
     setViewMode(ns.view);
   }, [searchParams, defSync]);
-
-  const showClientInSlot = useMemo(() => {
-    const ids = new Set(posts.map((p) => p.clientId));
-    return ids.size > 1;
-  }, [posts]);
 
   const postsByYmd = useMemo(() => groupPostsByYmd(posts), [posts]);
 
@@ -372,57 +358,26 @@ export function ContentCalendar({
         >
           {cell.dayNumber}
         </span>
-        <ul className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
+        <ul className="flex min-h-0 flex-1 flex-row flex-wrap content-start gap-1 overflow-y-auto">
           {dayPosts.map((post) => {
-            const label = postCalendarShortHandle(post, clients);
             const clientRow = clients.find((c) => c.id === post.clientId);
-            const acc = clientRow?.socialAccounts.find(
-              (s) => s.id === post.socialAccountId
-            );
-            const platform = acc?.platform ?? "instagram";
+            const clientName = clientRow?.fullName?.trim() || "Клиент";
             const borderColor = BORDER_BY_STATUS[post.status];
-            const captionLine =
-              post.caption.split("\n").find((l) => l.trim())?.slice(0, 140) ?? "";
-            const timePart = `${POST_DRAFT_STATUS_LABELS[post.status]} · ${timeShort(
-              post.publishTime
-            )}`;
-            const clientSlot =
-              platform === "telegram"
-                ? `TG ${label}`
-                : platform === "vk"
-                  ? `VK ${label}`
-                  : platform === "facebook"
-                    ? `FB ${label}`
-                    : `@${label}`;
-            const title = showClientInSlot
-              ? `${timePart} · ${clientSlot}\n${captionLine}`
-              : `${timePart}\n${captionLine}`;
+            const t = timeShort(post.publishTime);
+            const title = `${t} · ${clientName}`;
 
             return (
-              <li key={post.id}>
+              <li key={post.id} className="min-w-0 max-w-full">
                 <Link
                   href={`/posts/${post.id}/edit?returnTo=${encodeURIComponent(returnToForPostEdit)}`}
                   title={title}
-                  className="block rounded-md border-2 border-solid bg-[var(--surface-elevated)] px-1 py-0.5 text-left text-[10px] leading-snug text-[var(--foreground)] transition-opacity hover:opacity-90 sm:px-1.5 sm:text-[11px]"
+                  className="inline-flex w-max max-w-full min-w-0 items-baseline gap-x-1 rounded border border-solid bg-[var(--surface-elevated)] p-[5px] text-left text-[9px] leading-none text-[var(--foreground)] transition-opacity hover:opacity-90 sm:text-[10px]"
                   style={{ borderColor }}
                 >
-                  <span className="font-semibold tabular-nums text-[var(--muted)]">
-                    {timeShort(post.publishTime)}
+                  <span className="shrink-0 font-medium tabular-nums text-[var(--muted)]">
+                    {t}
                   </span>
-                  {showClientInSlot ? (
-                    <span className="text-[var(--foreground)]">
-                      {platform === "instagram" ? (
-                        <> @{label}</>
-                      ) : platform === "facebook" ? (
-                        <> FB · {label}</>
-                      ) : (
-                        <> {label}</>
-                      )}
-                    </span>
-                  ) : null}
-                  <span className="mt-0.5 block truncate text-[var(--muted)]">
-                    {POST_TYPE_ABBR[post.postType]}
-                  </span>
+                  <span className="min-w-0 truncate font-medium">{clientName}</span>
                 </Link>
               </li>
             );

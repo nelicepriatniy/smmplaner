@@ -4,19 +4,17 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { CalendarPageFilters } from "@/app/(main)/calendar/CalendarPageFilters";
 import {
-  CURRENT_POSTS_STATUS_FILTER_OPTIONS,
   parseClientIdsFromSearchParam,
   parsePlatformsFromSearchParam,
-  parseStatusesFromSearchParam,
 } from "@/app/(main)/calendar/calendarFilters";
 import {
   PostsListView,
   sortPostsByPublishSchedule,
 } from "@/components/posts/PostsListView";
+import { clientSelectLabel } from "@/domain/smm";
 import { headerAccentButtonClass } from "@/lib/headerAccentButtonClass";
 import { getSiteOriginFromHeaders } from "@/lib/media-display";
 import { getServerRefMs } from "@/lib/serverRefMs";
-import { clientSelectLabel } from "@/domain/smm";
 import {
   listClientsForUser,
   listPostsForUser,
@@ -24,23 +22,18 @@ import {
 } from "@/lib/smm-data";
 
 export const metadata: Metadata = {
-  title: "Актуальные посты — smmplaner",
-  description: "Запланированные и недавно созданные посты",
+  title: "Архив постов — smmplaner",
+  description: "Опубликованные посты",
 };
 
 type PageProps = {
   searchParams: Promise<{
     client?: string;
     platform?: string;
-    status?: string;
   }>;
 };
 
-const allowedCurrentStatuses = new Set(
-  CURRENT_POSTS_STATUS_FILTER_OPTIONS.map((o) => o.id),
-);
-
-export default async function CurrentPostsPage({ searchParams }: PageProps) {
+export default async function PostsArchivePage({ searchParams }: PageProps) {
   const sp = await searchParams;
   const userId = await requireUserId();
   const refMs = await getServerRefMs();
@@ -58,11 +51,8 @@ export default async function CurrentPostsPage({ searchParams }: PageProps) {
     validClientIds,
   );
   const platformFilter = parsePlatformsFromSearchParam(sp.platform);
-  const statusFilter = parseStatusesFromSearchParam(sp.status).filter((s) =>
-    allowedCurrentStatuses.has(s),
-  );
 
-  let rows = allPosts.filter((p) => p.status !== "published");
+  let rows = allPosts.filter((p) => p.status === "published");
   rows = rows.filter((p) =>
     filterClientIds.length > 0 ? filterClientIds.includes(p.clientId) : true,
   );
@@ -71,15 +61,10 @@ export default async function CurrentPostsPage({ searchParams }: PageProps) {
       platformFilter.includes(p.socialAccount.platform),
     );
   }
-  if (statusFilter.length > 0) {
-    rows = rows.filter((p) => statusFilter.includes(p.status));
-  }
   rows = sortPostsByPublishSchedule(rows);
 
   const hasActiveFilters =
-    filterClientIds.length > 0 ||
-    platformFilter.length > 0 ||
-    statusFilter.length > 0;
+    filterClientIds.length > 0 || platformFilter.length > 0;
 
   const filterOptions = clients.map((c) => ({
     id: c.id,
@@ -92,10 +77,10 @@ export default async function CurrentPostsPage({ searchParams }: PageProps) {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
           <div className="min-w-0">
             <h1 className="text-[22px] font-semibold tracking-tight text-[var(--foreground)] sm:text-[24px]">
-              Актуальные посты
+              Архив постов
             </h1>
             <p className="mt-1 text-[14px] text-[var(--muted)]">
-              Черновики и запланированные публикации из базы данных.
+              Посты со статусом «Опубликован».
             </p>
           </div>
           <div className="flex w-full flex-shrink-0 flex-row flex-wrap items-center justify-end gap-2 sm:w-auto sm:gap-2.5">
@@ -118,7 +103,7 @@ export default async function CurrentPostsPage({ searchParams }: PageProps) {
           <CalendarPageFilters
             clientOptions={filterOptions}
             direction="row"
-            statusOptions={CURRENT_POSTS_STATUS_FILTER_OPTIONS}
+            showStatusFilter={false}
           />
         </div>
       </Suspense>
@@ -130,7 +115,7 @@ export default async function CurrentPostsPage({ searchParams }: PageProps) {
         refMs={refMs}
         hasActiveFilters={hasActiveFilters}
         emptyFilteredMessage="Нет постов, подходящих под выбранные фильтры."
-        emptyNoFiltersMessage="Постов пока нет. Создайте пост в разделе «Новый пост» или импортируйте демо через сид."
+        emptyNoFiltersMessage="Опубликованных постов пока нет."
       />
     </main>
   );

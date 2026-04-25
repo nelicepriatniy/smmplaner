@@ -1,6 +1,7 @@
 import dns from "node:dns";
 import { readFile } from "fs/promises";
 import { basename, join } from "path";
+import { normalizePostImageUrlForStorage } from "@/lib/post-image-urls";
 
 if (typeof dns.setDefaultResultOrder === "function") {
   dns.setDefaultResultOrder("ipv4first");
@@ -51,7 +52,7 @@ function resolvePhoto(
   relativeOrAbsolute: string,
   appBaseUrl: string | null
 ): ResolvedPhoto | null {
-  const u = relativeOrAbsolute.trim();
+  const u = normalizePostImageUrlForStorage(relativeOrAbsolute).trim();
   if (!u) return null;
   if (/^https?:\/\//i.test(u)) return { kind: "url", url: u };
   if (u.startsWith("/")) {

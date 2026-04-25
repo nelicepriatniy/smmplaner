@@ -31,7 +31,11 @@ export default async function ClientReviewPage({ params }: PageProps) {
   if (!post) notFound();
 
   const client = await getClientRecordById(post.clientId);
-  const publisher = toPostPublisherPreview(client, post.socialAccount);
+  const publisher = toPostPublisherPreview(
+    client,
+    post.socialAccount,
+    post.telegramChatTargetIds
+  );
   const refMs = await getServerRefMs();
   const reviewToken = decodeURIComponent(token).trim();
 

@@ -26,9 +26,11 @@ export function TelegramPostPreview({
       ? publisher.vkOwnerId?.trim()
         ? `стена ${publisher.vkOwnerId.trim()}`
         : "ВКонтакте"
-      : publisher?.telegramChatId?.trim()
-        ? `чат ${publisher.telegramChatId.trim()}`
-        : "Telegram";
+      : publisher?.telegramSubtitle?.trim()
+        ? publisher.telegramSubtitle.trim()
+        : publisher?.telegramChatId?.trim()
+          ? `чат ${publisher.telegramChatId.trim()}`
+          : "Telegram";
 
   const displayUrls = useMemo(
     () => imageUrls.map((u) => rewritePublicUploadMediaSrc(u)),

@@ -13,7 +13,9 @@ import {
   createClientAction,
   updateClientAction,
 } from "@/app/(main)/clients/actions";
+import { TelegramChatsEditor, newTargetRow } from "@/components/clients/TelegramChatsEditor";
 import { VkIdTokenButton } from "@/components/clients/VkIdTokenButton";
+import type { TelegramChatTarget } from "@/lib/telegram-targets";
 
 const inputClass =
   "w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3.5 py-2.5 text-[15px] text-[var(--foreground)] outline-offset-2 focus:border-[color-mix(in_srgb,var(--accent)_50%,var(--border))] focus:ring-2 focus:ring-[var(--accent-soft)]";
@@ -41,7 +43,7 @@ type FormState = {
   contact: string;
   activitySpheres: string;
   telegramBotToken: string;
-  telegramChatId: string;
+  telegramChats: TelegramChatTarget[];
   vkWallKind: VkWallKind;
   vkWallEntityId: string;
   vkFromGroup: boolean;
@@ -60,7 +62,7 @@ function buildInitialState(): FormState {
     contact: "",
     activitySpheres: "",
     telegramBotToken: "",
-    telegramChatId: "",
+    telegramChats: [newTargetRow()],
     vkWallKind: "group",
     vkWallEntityId: "",
     vkFromGroup: true,
@@ -351,10 +353,16 @@ function ClientAddFormBody({ onDismiss, onSaved }: ClientAddFormBodyProps) {
                 }`}
                 aria-checked={values.platform === "telegram"}
                 role="radio"
-                onClick={() => setField("platform", "telegram")}
-              >
-                Telegram
-              </button>
+                onClick={() => {
+                  setValues((p) => ({
+                    ...p,
+                    platform: "telegram",
+                    telegramChats: p.telegramChats.length ? p.telegramChats : [newTargetRow()],
+                  }));
+                }}
+                >
+                  Telegram
+                </button>
               <button
                 type="button"
                 className={`rounded-xl border px-3 py-2.5 text-[14px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
@@ -699,25 +707,15 @@ function ClientAddFormBody({ onDismiss, onSaved }: ClientAddFormBodyProps) {
                 </p>
               </div>
               <div>
-                <label
-                  htmlFor={`${formId}-tgchat`}
-                  className="text-[14px] font-medium text-[var(--foreground)]"
-                >
-                  ID чата для постов
-                </label>
-                <input
-                  id={`${formId}-tgchat`}
-                  name="telegramChatId"
-                  className={`mt-2 ${inputClass} font-mono text-[14px]`}
-                  value={values.telegramChatId}
-                  onChange={(e) => setField("telegramChatId", e.target.value)}
-                  required
-                  autoComplete="off"
-                  placeholder="например -1001234567890 или @channelusername"
-                />
-                <p className="mt-1 text-[12px] text-[var(--muted)]">
-                  Канал, группа или чат, куда будут уходить материалы этого клиента.
-                </p>
+                <span className="text-[14px] font-medium text-[var(--foreground)]">
+                  Чаты для публикации
+                </span>
+                <div className="mt-2">
+                  <TelegramChatsEditor
+                    value={values.telegramChats}
+                    onChange={(next) => setField("telegramChats", next)}
+                  />
+                </div>
               </div>
             </>
           ) : (

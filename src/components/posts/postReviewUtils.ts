@@ -1,22 +1,27 @@
 import type { PostReviewComment } from "./postReviewTypes";
+import { PUBLISH_SCHEDULE_TZ } from "@/domain/smm";
 
 const H = 60 * 60 * 1e3;
 const D = 24 * H;
 
 /** Сдвиг от «сейчас» — нельзя выбрать время ближе (если сегодня). */
-const PUBLISH_EARLY_MINUTES = 30;
+const PUBLISH_EARLY_MINUTES = 5;
 
-function toYmdLocal(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+function toYmdInScheduleZone(d: Date, timeZone: string = PUBLISH_SCHEDULE_TZ): string {
+  return d.toLocaleDateString("sv-SE", { timeZone });
 }
 
-function toHmLocal(d: Date): string {
-  const h = String(d.getHours()).padStart(2, "0");
-  const min = String(d.getMinutes()).padStart(2, "0");
-  return `${h}:${min}`;
+function toHmInScheduleZone(d: Date, timeZone: string = PUBLISH_SCHEDULE_TZ): string {
+  const f = new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  const parts = f.formatToParts(d);
+  const ho = parts.find((p) => p.type === "hour")?.value ?? "0";
+  const mo = parts.find((p) => p.type === "minute")?.value ?? "0";
+  return `${ho.padStart(2, "0")}:${mo.padStart(2, "0")}`;
 }
 
 function earliestAfterBuffer(now: Date): Date {
@@ -44,52 +49,54 @@ function timeToMinutes(s: string): number {
 
 function getDefaultForNow(now: Date): { date: string; time: string } {
   const t = nextFullHourOnOrAfter(earliestAfterBuffer(now));
-  return { date: toYmdLocal(t), time: toHmLocal(t) };
+  return { date: toYmdInScheduleZone(t), time: toHmInScheduleZone(t) };
 }
 
-/** `type="date"` + `type="time"` (локаль: следующий целый час, но не раньше чем +30 мин). */
+/**
+ * `type="date"` + `type="time"` (Europe/Moscow: следующий целый час, не раньше +5 мин от сейчас).
+ */
 export function getDefaultPublishSchedule(): { date: string; time: string } {
   return getDefaultForNow(new Date());
 }
 
-/** `YYYY-MM-DD` для сегодня (локаль) — `min` у `input[type=date]`. */
+/** `YYYY-MM-DD` для «сегодня» по московскому календарю — `min` у `input[type=date]`. */
 export function getTodayYmdString(now: Date = new Date()): string {
-  return toYmdLocal(now);
+  return toYmdInScheduleZone(now);
 }
 
 /**
  * `min` для `input[type=time]`, если выбрана дата;
- * `undefined` — при будущем дне или при крае «+30 мин уже завтра» (состояние нормализуется).
+ * `undefined` — при будущем дне или при крае «+5 мин уже завтра» (состояние нормализуется).
  */
 export function getMinTimeForDateField(
   ymd: string,
   now: Date = new Date()
 ): string | undefined {
-  const today = toYmdLocal(now);
+  const today = toYmdInScheduleZone(now);
   if (ymd < today) return "23:59";
   if (ymd > today) return undefined;
   const ear = earliestAfterBuffer(now);
-  if (toYmdLocal(ear) > ymd) return undefined;
-  return toHmLocal(ear);
+  if (toYmdInScheduleZone(ear) > ymd) return undefined;
+  return toHmInScheduleZone(ear);
 }
 
-/** Согласовать дату/время: не раньше сегодня; сегодня — не раньше +30 мин, при смене дня — сдвиг. */
+/** Согласовать дату/время: не раньше сегодня; сегодня — не раньше +5 мин, при смене дня — сдвиг. */
 export function normalizePublishSchedule(
   s: { date: string; time: string },
   now: Date = new Date()
 ): { date: string; time: string } {
   if (!s.date || !s.time) return getDefaultForNow(now);
-  const today = toYmdLocal(now);
+  const today = toYmdInScheduleZone(now);
   if (s.date < today) return getDefaultForNow(now);
   if (s.date > today) return s;
 
   const ear = earliestAfterBuffer(now);
-  if (toYmdLocal(ear) > s.date) {
-    return { date: toYmdLocal(ear), time: toHmLocal(ear) };
+  if (toYmdInScheduleZone(ear) > s.date) {
+    return { date: toYmdInScheduleZone(ear), time: toHmInScheduleZone(ear) };
   }
-  if (toYmdLocal(ear) === s.date) {
-    if (timeToMinutes(s.time) < timeToMinutes(toHmLocal(ear))) {
-      return { date: s.date, time: toHmLocal(ear) };
+  if (toYmdInScheduleZone(ear) === s.date) {
+    if (timeToMinutes(s.time) < timeToMinutes(toHmInScheduleZone(ear))) {
+      return { date: s.date, time: toHmInScheduleZone(ear) };
     }
   }
   return s;

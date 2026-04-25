@@ -18,6 +18,10 @@ import type {
   RecentActivityRecord,
 } from "@/domain/smm";
 import { prisma } from "@/lib/prisma";
+import {
+  normalizeAccountTelegramChats,
+  parsePostTelegramTargetIds,
+} from "@/lib/telegram-targets";
 import type { PostType } from "@/types/postType";
 
 function spheresTuple(json: unknown): [string] | [string, string] {
@@ -41,6 +45,10 @@ function prismaPostTypeToDomain(t: PostContentType): PostType {
 export function toSocialAccountRecord(
   row: PrismaClientSocialAccount
 ): ClientSocialAccountRecord {
+  const telegramChats = normalizeAccountTelegramChats(
+    row.telegramChats,
+    row.telegramChatId
+  );
   return {
     id: row.id,
     clientId: row.clientId,
@@ -50,6 +58,7 @@ export function toSocialAccountRecord(
     facebookPageId: row.facebookPageId ?? undefined,
     businessAccountConfirmed: row.businessAccountConfirmed,
     telegramChatId: row.telegramChatId ?? undefined,
+    telegramChats: telegramChats.length ? telegramChats : undefined,
     hasTelegramBotToken: Boolean(row.telegramBotToken?.trim()),
     vkOwnerId: row.vkOwnerId ?? undefined,
     vkFromGroup: row.vkFromGroup,
@@ -68,6 +77,7 @@ export function toPostDraftRecord(row: PostRowWithRelations): PostDraftRecord {
     id: row.id,
     clientId: row.socialAccount.clientId,
     socialAccountId: row.clientSocialAccountId,
+    telegramChatTargetIds: parsePostTelegramTargetIds(row.telegramChatTargetIds),
     socialAccount: toSocialAccountRecord(row.socialAccount),
     status: prismaStatusToDomain(row.status),
     postType: prismaPostTypeToDomain(row.postType),

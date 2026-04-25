@@ -26,6 +26,7 @@ import {
   type PostDraftStatus,
   type PostEditorInitialValues,
 } from "@/domain/smm";
+import { normalizeAccountTelegramChats } from "@/lib/telegram-targets";
 import {
   isFeedLikePostType,
   POST_TYPE_OPTIONS,
@@ -47,6 +48,8 @@ type NewPostEditorProps = {
   existingPostId?: string;
   existingPostStatus?: PostDraftStatus;
   initialValues?: PostEditorInitialValues | null;
+  /** Снимок `telegram_chat_target_ids` из БД (редактирование) — надёжнее, чем только `initialValues`. */
+  savedTelegramChatTargetIds?: string[] | null;
   initialClientId?: string;
   /** Предвыбор аккаунта соцсети (например из URL `?social=`). */
   initialSocialAccountId?: string;
@@ -110,11 +113,48 @@ function seedForNew(
   return null;
 }
 
+function pickPersistedTelegramIds(
+  savedTelegramChatTargetIds: string[] | null | undefined,
+  isEditMode: boolean,
+  initialValues: PostEditorInitialValues | null,
+  duplicateFrom: PostEditorInitialValues | null
+): string[] {
+  const raw =
+    savedTelegramChatTargetIds ??
+    (isEditMode ? initialValues?.telegramChatTargetIds : undefined) ??
+    duplicateFrom?.telegramChatTargetIds ??
+    initialValues?.telegramChatTargetIds ??
+    [];
+  return [...raw].map((x) => String(x).trim()).filter(Boolean);
+}
+
+function initialTelegramTargetIds(
+  clients: ClientRecord[],
+  socialAccountId: string,
+  persistedIds: string[],
+  isEditMode: boolean
+): string[] {
+  for (const c of clients) {
+    const acc = c.socialAccounts.find((s) => s.id === socialAccountId);
+    if (!acc || acc.platform !== "telegram") return [];
+    const targets = normalizeAccountTelegramChats(acc.telegramChats, acc.telegramChatId);
+    if (!targets.length) return [];
+    const fromSeed = persistedIds.filter((id) => targets.some((t) => t.id === id));
+    if (fromSeed.length > 0) return fromSeed;
+    if (isEditMode && targets.length > 0) {
+      return [targets[0]!.id];
+    }
+    return targets.map((t) => t.id);
+  }
+  return [];
+}
+
 export function NewPostEditor({
   clients,
   existingPostId,
   existingPostStatus,
   initialValues = null,
+  savedTelegramChatTargetIds = null,
   initialClientId,
   initialSocialAccountId,
   duplicateFrom = null,
@@ -140,6 +180,31 @@ export function NewPostEditor({
 
   const [clientId, setClientId] = useState(init.clientId);
   const [socialAccountId, setSocialAccountId] = useState(init.socialAccountId);
+  const persistedTelegramIdsRef = useRef(
+    pickPersistedTelegramIds(
+      savedTelegramChatTargetIds,
+      isEditMode,
+      initialValues,
+      duplicateFrom
+    )
+  );
+  const [telegramTargetIds, setTelegramTargetIds] = useState<string[]>(() =>
+    initialTelegramTargetIds(
+      clients,
+      init.socialAccountId,
+      persistedTelegramIdsRef.current,
+      isEditMode
+    )
+  );
+
+  useEffect(() => {
+    persistedTelegramIdsRef.current = pickPersistedTelegramIds(
+      savedTelegramChatTargetIds,
+      isEditMode,
+      initialValues,
+      duplicateFrom
+    );
+  }, [savedTelegramChatTargetIds, isEditMode, initialValues, duplicateFrom]);
 
   const [postType, setPostType] = useState<PostType>(
     () => seed?.postType ?? "feed"
@@ -204,8 +269,13 @@ export function NewPostEditor({
     publishPlatform === "instagram" || publishPlatform === "facebook";
 
   const publisher = useMemo(
-    () => toPostPublisherPreview(selectedClient, selectedAccount),
-    [selectedClient, selectedAccount]
+    () =>
+      toPostPublisherPreview(
+        selectedClient,
+        selectedAccount,
+        publishPlatform === "telegram" ? telegramTargetIds : null
+      ),
+    [selectedClient, selectedAccount, publishPlatform, telegramTargetIds]
   );
 
   useEffect(() => {
@@ -232,6 +302,16 @@ export function NewPostEditor({
       setAltText("");
     }
   }, [publishPlatform]);
+
+  const toggleTelegramTarget = useCallback((id: string) => {
+    setTelegramTargetIds((prev) => {
+      if (prev.includes(id)) {
+        if (prev.length <= 1) return prev;
+        return prev.filter((x) => x !== id);
+      }
+      return [...prev, id];
+    });
+  }, []);
 
   const typeHint = useMemo(
     () => POST_TYPE_OPTIONS.find((o) => o.value === postType),
@@ -294,6 +374,8 @@ export function NewPostEditor({
       imageUrls,
       publishDate: publishSchedule.date,
       publishTime: publishSchedule.time,
+      telegramChatTargetIds:
+        publishPlatform === "telegram" ? telegramTargetIds : [],
     };
   }, [
     socialAccountId,
@@ -306,6 +388,7 @@ export function NewPostEditor({
     publishSchedule.date,
     publishSchedule.time,
     publishPlatform,
+    telegramTargetIds,
   ]);
 
   const ro = publishedReadOnly;
@@ -385,10 +468,13 @@ export function NewPostEditor({
   );
 
   const removePost = useCallback(() => {
-    if (!existingPostId || ro) return;
+    if (!existingPostId) return;
     void (async () => {
       const ok = await confirm({
-        message: "Удалить этот пост? Действие необратимо.",
+        message:
+          existingPostStatus === "published"
+            ? "Удалить этот пост из приложения? Публикация в соцсети при этом не удаляется. Действие необратимо."
+            : "Удалить этот пост? Действие необратимо.",
         confirmLabel: "Удалить",
         danger: true,
       });
@@ -401,11 +487,22 @@ export function NewPostEditor({
           return;
         }
         toast({ message: "Пост удалён", variant: "success" });
-        router.push("/posts/current");
+        router.push(
+          existingPostStatus === "published"
+            ? "/posts/archive"
+            : "/posts/current",
+        );
         router.refresh();
       });
     })();
-  }, [confirm, existingPostId, ro, router, startDeleteTransition, toast]);
+  }, [
+    confirm,
+    existingPostId,
+    existingPostStatus,
+    router,
+    startDeleteTransition,
+    toast,
+  ]);
 
   const publishNow = useCallback(() => {
     if (!existingPostId || ro) return;
@@ -462,8 +559,70 @@ export function NewPostEditor({
     Boolean(clientId) &&
     Boolean(socialAccountId) &&
     Boolean(selectedAccount) &&
+    (publishPlatform !== "telegram" || telegramTargetIds.length > 0) &&
     imageUploadState === "idle" &&
     !ro;
+
+  const telegramTargets = useMemo(() => {
+    if (selectedAccount?.platform !== "telegram") return [];
+    return normalizeAccountTelegramChats(
+      selectedAccount.telegramChats,
+      selectedAccount.telegramChatId
+    );
+  }, [selectedAccount]);
+
+  /** Стабильная подпись списка чатов — чтобы эффект не сбрасывал выбор при том же аккаунте. */
+  const telegramTargetsFingerprint = useMemo(() => {
+    if (!selectedAccount || selectedAccount.platform !== "telegram") return "";
+    return normalizeAccountTelegramChats(
+      selectedAccount.telegramChats,
+      selectedAccount.telegramChatId
+    )
+      .map((t) => t.id)
+      .sort()
+      .join("|");
+  }, [selectedAccount]);
+
+  const lastTelegramSyncKey = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (publishPlatform !== "telegram") {
+      setTelegramTargetIds([]);
+      lastTelegramSyncKey.current = null;
+      return;
+    }
+    if (!selectedAccount || selectedAccount.platform !== "telegram") {
+      return;
+    }
+    const syncKey = `${clientId}:${socialAccountId}:${telegramTargetsFingerprint}`;
+    if (lastTelegramSyncKey.current === syncKey) {
+      return;
+    }
+    lastTelegramSyncKey.current = syncKey;
+    const targets = normalizeAccountTelegramChats(
+      selectedAccount.telegramChats,
+      selectedAccount.telegramChatId
+    );
+    setTelegramTargetIds((prev) => {
+      const next = prev.filter((id) => targets.some((t) => t.id === id));
+      if (next.length > 0) return next;
+      const fromServer = persistedTelegramIdsRef.current.filter((id) =>
+        targets.some((t) => t.id === id)
+      );
+      if (fromServer.length > 0) return fromServer;
+      if (isEditMode && targets.length > 0) {
+        return [targets[0]!.id];
+      }
+      return targets.map((t) => t.id);
+    });
+  }, [
+    publishPlatform,
+    clientId,
+    socialAccountId,
+    telegramTargetsFingerprint,
+    selectedAccount,
+    isEditMode,
+  ]);
 
   const publishBusy = isSaving || isDeleting || isPublishing;
 
@@ -603,6 +762,54 @@ export function NewPostEditor({
                   </div>
                 ) : null}
               </div>
+
+              {publishPlatform === "telegram" && telegramTargets.length > 0 ? (
+                <div className="mt-1">
+                  <span className="text-[13px] font-medium text-[var(--foreground)]">
+                    Чаты Telegram
+                  </span>
+                  <p className="mt-0.5 text-[11px] leading-snug text-[var(--muted)]">
+                    Куда отправлять (несколько можно). Сохранённые в посте чаты подставляются при
+                    открытии редактора.
+                  </p>
+                  <div
+                    className="mt-2 flex flex-wrap gap-2"
+                    role="group"
+                    aria-label="Чаты Telegram для отправки"
+                  >
+                    {telegramTargets.map((t) => {
+                      const checked = telegramTargetIds.includes(t.id);
+                      const label = t.name.trim() || "Чат";
+                      return (
+                        <label
+                          key={t.id}
+                          className={`inline-flex max-w-full cursor-pointer items-center gap-1.5 rounded-lg border px-2 py-1 text-[12px] font-medium transition-colors ${
+                            checked
+                              ? "border-[color-mix(in_srgb,var(--accent)_45%,var(--border))] bg-[var(--surface-elevated)] text-[var(--foreground)]"
+                              : "border-[var(--border)] bg-[var(--background)] text-[var(--muted)] hover:text-[var(--foreground)]"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            className="size-3.5 shrink-0 rounded border-[var(--border)]"
+                            checked={checked}
+                            disabled={ro}
+                            onChange={() => {
+                              toggleTelegramTarget(t.id);
+                            }}
+                          />
+                          <span className="max-w-[11rem] truncate">{label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : publishPlatform === "telegram" && telegramTargets.length === 0 ? (
+                <p className="rounded-lg border border-amber-500/35 bg-amber-950/25 px-3 py-2 text-[13px] text-amber-100">
+                  В карточке клиента не настроены чаты Telegram. Откройте клиента и добавьте хотя бы
+                  один чат с названием и ID.
+                </p>
+              ) : null}
 
               {graphFeedEditor ? (
                 <p className="mt-2 text-[13px] leading-snug text-[var(--muted)]">
@@ -856,6 +1063,15 @@ export function NewPostEditor({
                 {isDeleting ? "Удаление…" : "Удалить"}
               </button>
             </>
+          ) : isEditMode && publishedReadOnly ? (
+            <button
+              type="button"
+              onClick={removePost}
+              disabled={isDeleting}
+              className="rounded-xl border border-rose-500/45 bg-transparent px-5 py-2.5 text-[14px] font-semibold text-rose-200 transition-colors hover:bg-rose-950/35 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isDeleting ? "Удаление…" : "Удалить"}
+            </button>
           ) : !isEditMode ? (
             <>
               <button
@@ -939,7 +1155,7 @@ export function NewPostEditor({
           aria-label="План публикации"
         >
           <h3 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
-            Дата и время
+            Дата и время (МСК)
           </h3>
           <p className="text-[13px] text-[var(--muted)]">
             {publishPlatform === "telegram"

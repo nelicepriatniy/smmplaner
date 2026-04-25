@@ -1,7 +1,13 @@
 import type { PostDraftRecord } from "@/domain/smm";
 import { H_MS, MOCK_DISCUSSION_REF_MS } from "@/domain/smm";
 
-type DemoPostSeed = Omit<PostDraftRecord, "socialAccountId" | "socialAccount">;
+type DemoPostSeed = Omit<
+  PostDraftRecord,
+  "socialAccountId" | "socialAccount" | "telegramChatTargetIds"
+> & {
+  /** Демо-посты в сиде — только Instagram; поле опционально. */
+  telegramChatTargetIds?: string[];
+};
 
 const _IG_HANDLE: Record<string, string> = {
   c1: "volkovabeauty",
@@ -17,6 +23,7 @@ function attachDemoSocial(rows: DemoPostSeed[]): PostDraftRecord[] {
     const handle = _IG_HANDLE[p.clientId] ?? "";
     return {
       ...p,
+      telegramChatTargetIds: p.telegramChatTargetIds ?? [],
       socialAccountId: sid,
       socialAccount: {
         id: sid,

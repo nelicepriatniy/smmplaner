@@ -1,12 +1,18 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { Prisma } from "@prisma/client";
 import type { PostContentType, PostDraftStatus } from "@prisma/client";
 import { auth } from "@/auth";
 import { getAppBaseUrl } from "@/lib/app-base-url";
 import { newClientReviewToken } from "@/lib/clientReviewToken";
 import { deletePostUploadedImageFiles } from "@/lib/post-upload-files";
 import { prisma } from "@/lib/prisma";
+import { normalizePostImageUrlForStorage } from "@/lib/post-image-urls";
+import {
+  normalizeAccountTelegramChats,
+  resolveTelegramChatIdsForTargets,
+} from "@/lib/telegram-targets";
 import { sendPostToTelegramChat } from "@/lib/telegram-send";
 import { sendPostToVkWall } from "@/lib/vk-wall-send";
 import type { PostType } from "@/types/postType";
@@ -25,6 +31,8 @@ export type PostSavePayload = {
   imageUrls: string[];
   publishDate: string;
   publishTime: string;
+  /** Id целей из `telegram_chats` аккаунта; для Telegram — минимум один. */
+  telegramChatTargetIds: string[];
 };
 
 async function requireUserId(): Promise<string | null> {
@@ -34,7 +42,9 @@ async function requireUserId(): Promise<string | null> {
 
 /** Разрешённые URL изображений: внешние http(s) и файлы, загруженные в public/uploads/posts. */
 function sanitizeImageUrlsForStorage(urls: string[]): string[] {
-  return urls.filter((u) => {
+  return urls
+    .map((u) => normalizePostImageUrlForStorage(u))
+    .filter((u) => {
     if (/^https?:\/\//i.test(u)) return true;
     if (!u.startsWith("/uploads/posts/")) return false;
     if (u.includes("..")) return false;
@@ -45,6 +55,7 @@ function sanitizeImageUrlsForStorage(urls: string[]): string[] {
 function revalidatePostPaths(userId: string, postId: string, clientId: string) {
   revalidatePath("/");
   revalidatePath("/posts/current");
+  revalidatePath("/posts/archive");
   revalidatePath("/posts/new");
   revalidatePath("/calendar");
   revalidatePath("/clients");
@@ -60,6 +71,18 @@ async function loadSocialAccountForUser(userId: string, socialAccountId: string)
   });
 }
 
+function telegramTargetsError(
+  platform: string,
+  telegramChats: unknown,
+  telegramChatId: string | null,
+  targetIds: string[]
+): string | null {
+  if (platform !== "telegram") return null;
+  const targets = normalizeAccountTelegramChats(telegramChats, telegramChatId);
+  const r = resolveTelegramChatIdsForTargets(targets, targetIds);
+  return r.ok ? null : r.error;
+}
+
 async function createPostWithStatus(
   payload: PostSavePayload,
   status: PostDraftStatus
@@ -69,6 +92,14 @@ async function createPostWithStatus(
 
   const acc = await loadSocialAccountForUser(userId, payload.socialAccountId);
   if (!acc) return { ok: false, error: "Соцсеть не найдена или не принадлежит вам." };
+
+  const tgErr = telegramTargetsError(
+    acc.platform,
+    acc.telegramChats,
+    acc.telegramChatId,
+    payload.telegramChatTargetIds ?? []
+  );
+  if (tgErr) return { ok: false, error: tgErr };
 
   const imageUrls = sanitizeImageUrlsForStorage(payload.imageUrls);
   const token = newClientReviewToken();
@@ -87,6 +118,10 @@ async function createPostWithStatus(
         imageUrls,
         publishDate: payload.publishDate,
         publishTime: payload.publishTime,
+        telegramChatTargetIds:
+          acc.platform === "telegram"
+            ? (payload.telegramChatTargetIds as Prisma.InputJsonValue)
+            : undefined,
         createdAt: new Date(),
         clientReviewToken: token,
       },
@@ -138,6 +173,14 @@ export async function updatePostAction(
   const acc = await loadSocialAccountForUser(userId, payload.socialAccountId);
   if (!acc) return { ok: false, error: "Соцсеть не найдена или не принадлежит вам." };
 
+  const tgErr = telegramTargetsError(
+    acc.platform,
+    acc.telegramChats,
+    acc.telegramChatId,
+    payload.telegramChatTargetIds ?? []
+  );
+  if (tgErr) return { ok: false, error: tgErr };
+
   const imageUrls = sanitizeImageUrlsForStorage(payload.imageUrls);
   const prevClientId = existing.socialAccount.clientId;
 
@@ -154,6 +197,10 @@ export async function updatePostAction(
         imageUrls,
         publishDate: payload.publishDate,
         publishTime: payload.publishTime,
+        telegramChatTargetIds:
+          acc.platform === "telegram"
+            ? (payload.telegramChatTargetIds as Prisma.InputJsonValue)
+            : Prisma.DbNull,
       },
     });
 
@@ -197,24 +244,32 @@ export async function publishPostNowAction(
 
   if (acc.platform === "telegram") {
     const botToken = acc.telegramBotToken?.trim();
-    const chatId = acc.telegramChatId?.trim();
-    if (!botToken || !chatId) {
+    if (!botToken) {
       return {
         ok: false,
-        error: "У аккаунта Telegram не заданы токен бота или ID чата.",
+        error: "У аккаунта Telegram не задан токен бота.",
       };
     }
+    const targets = normalizeAccountTelegramChats(acc.telegramChats, acc.telegramChatId);
+    const resolved = resolveTelegramChatIdsForTargets(
+      targets,
+      payload.telegramChatTargetIds ?? []
+    );
+    if (!resolved.ok) {
+      return { ok: false, error: resolved.error };
+    }
 
-    const send = await sendPostToTelegramChat({
-      botToken,
-      chatId,
-      caption: payload.caption,
-      imageUrls,
-      appBaseUrl,
-    });
-
-    if (!send.ok) {
-      return { ok: false, error: send.error };
+    for (const chatId of resolved.chatIds) {
+      const send = await sendPostToTelegramChat({
+        botToken,
+        chatId,
+        caption: payload.caption,
+        imageUrls,
+        appBaseUrl,
+      });
+      if (!send.ok) {
+        return { ok: false, error: send.error };
+      }
     }
 
     try {
@@ -231,6 +286,7 @@ export async function publishPostNowAction(
             imageUrls,
             publishDate: payload.publishDate,
             publishTime: payload.publishTime,
+            telegramChatTargetIds: payload.telegramChatTargetIds as Prisma.InputJsonValue,
             status: "published",
           },
         }),
@@ -305,6 +361,7 @@ export async function publishPostNowAction(
             imageUrls,
             publishDate: payload.publishDate,
             publishTime: payload.publishTime,
+            telegramChatTargetIds: Prisma.DbNull,
             status: "published",
           },
         }),

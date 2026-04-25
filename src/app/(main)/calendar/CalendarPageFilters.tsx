@@ -3,6 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import type { PostsClientFilterOption } from "@/components/posts/PostsClientFilter";
+import type { PostDraftStatus } from "@/domain/smm";
 import {
   CALENDAR_PLATFORM_OPTIONS,
   CALENDAR_STATUS_OPTIONS,
@@ -10,6 +11,8 @@ import {
   parsePlatformsFromSearchParam,
   parseStatusesFromSearchParam,
 } from "./calendarFilters";
+
+type StatusFilterOption = { id: PostDraftStatus; label: string };
 
 const btnTriggerClass =
   "inline-flex w-full min-w-0 max-w-full items-center justify-between gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-2.5 py-2 text-left text-[12px] text-[var(--foreground)] transition-[border,background,box-shadow] duration-200 ease-out hover:border-[color-mix(in_srgb,var(--accent)_20%,var(--border))] hover:bg-[var(--background)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] data-[open]:ring-1 data-[open]:ring-[var(--accent-soft)] sm:min-w-[11.5rem] sm:max-w-[14rem]";
@@ -24,6 +27,10 @@ type CalendarPageFiltersProps = {
    * `column` — в колонку (боковая панель «Актуальные посты»).
    */
   direction?: "row" | "column";
+  /** По умолчанию true. На странице архива постов — false. */
+  showStatusFilter?: boolean;
+  /** Подмножество статусов в выпадающем списке (календарь — все). */
+  statusOptions?: readonly StatusFilterOption[];
 };
 
 type DropKey = "client" | "platform" | "status";
@@ -127,13 +134,15 @@ function clientSummary(
 
 function platformOrStatusSummary(n: number, labels: string[]): string {
   if (n === 0) return "Все";
-  if (n === 1) return labels[0] ?? "";
+  if (n === 1) return labels[0]?.trim() ? labels[0]! : `Выбрано: ${n}`;
   return `Выбрано: ${n}`;
 }
 
 export function CalendarPageFilters({
   clientOptions,
   direction = "row",
+  showStatusFilter = true,
+  statusOptions = CALENDAR_STATUS_OPTIONS,
 }: CalendarPageFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -168,14 +177,17 @@ export function CalendarPageFilters({
     [selectedPlatforms]
   );
   const statusLabels = useMemo(
-    () => CALENDAR_STATUS_OPTIONS.filter((o) => selectedStatuses.includes(o.id)).map((o) => o.label),
-    [selectedStatuses]
+    () =>
+      statusOptions
+        .filter((o) => selectedStatuses.includes(o.id))
+        .map((o) => o.label),
+    [selectedStatuses, statusOptions],
   );
 
   const hasFilters =
     selectedClients.length > 0 ||
     selectedPlatforms.length > 0 ||
-    selectedStatuses.length > 0;
+    (showStatusFilter && selectedStatuses.length > 0);
 
   useEffect(() => {
     if (!openKey) return;
@@ -231,9 +243,7 @@ export function CalendarPageFilters({
     });
   }
 
-  function toggleStatus(
-    id: (typeof CALENDAR_STATUS_OPTIONS)[number]["id"]
-  ) {
+  function toggleStatus(id: StatusFilterOption["id"]) {
     pushParams((next) => {
       const set = new Set(
         parseStatusesFromSearchParam(next.get("status") ?? undefined)
@@ -344,45 +354,47 @@ export function CalendarPageFilters({
         </ul>
       </MultiSelectDropdown>
 
-      <MultiSelectDropdown
-        dKey="status"
-        open={openKey === "status"}
-        onOpen={() => setOpenKey("status")}
-        onClose={() => setOpenKey(null)}
-        kicker="Статусы"
-        buttonSummary={platformOrStatusSummary(
-          selectedStatuses.length,
-          statusLabels
-        )}
-      >
-        <ul className="space-y-0.5">
-          {CALENDAR_STATUS_OPTIONS.map((opt) => {
-            const checked = selectedStatuses.includes(opt.id);
-            const boxId = `${baseId}-st-${opt.id}`;
-            return (
-              <li key={opt.id} role="option" aria-selected={checked}>
-                <label
-                  htmlFor={boxId}
-                  className="flex cursor-pointer items-start gap-2 rounded-md px-1.5 py-1 text-[11px] leading-snug text-[var(--foreground)] hover:bg-[var(--surface-elevated)]"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <input
-                    id={boxId}
-                    type="checkbox"
-                    className="mt-0.5 size-3.5 shrink-0 rounded border-[var(--border)] accent-[var(--accent)]"
-                    checked={checked}
-                    onChange={() => {
-                      toggleStatus(opt.id);
-                    }}
+      {showStatusFilter ? (
+        <MultiSelectDropdown
+          dKey="status"
+          open={openKey === "status"}
+          onOpen={() => setOpenKey("status")}
+          onClose={() => setOpenKey(null)}
+          kicker="Статусы"
+          buttonSummary={platformOrStatusSummary(
+            selectedStatuses.length,
+            statusLabels,
+          )}
+        >
+          <ul className="space-y-0.5">
+            {statusOptions.map((opt) => {
+              const checked = selectedStatuses.includes(opt.id);
+              const boxId = `${baseId}-st-${opt.id}`;
+              return (
+                <li key={opt.id} role="option" aria-selected={checked}>
+                  <label
+                    htmlFor={boxId}
+                    className="flex cursor-pointer items-start gap-2 rounded-md px-1.5 py-1 text-[11px] leading-snug text-[var(--foreground)] hover:bg-[var(--surface-elevated)]"
                     onClick={(e) => e.stopPropagation()}
-                  />
-                  <span className="min-w-0">{opt.label}</span>
-                </label>
-              </li>
-            );
-          })}
-        </ul>
-      </MultiSelectDropdown>
+                  >
+                    <input
+                      id={boxId}
+                      type="checkbox"
+                      className="mt-0.5 size-3.5 shrink-0 rounded border-[var(--border)] accent-[var(--accent)]"
+                      checked={checked}
+                      onChange={() => {
+                        toggleStatus(opt.id);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <span className="min-w-0">{opt.label}</span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+        </MultiSelectDropdown>
+      ) : null}
 
       {hasFilters ? (
         <button

@@ -64,7 +64,7 @@ function activityHref(act: RecentActivityRecord): string | null {
     return `/posts/${act.postId}/edit`;
   }
   if (act.kind === "client_added") return "/clients";
-  if (act.kind === "post_published") return "/posts/current";
+  if (act.kind === "post_published") return "/posts/archive";
   return null;
 }
 

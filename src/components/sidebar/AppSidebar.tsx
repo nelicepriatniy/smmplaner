@@ -11,6 +11,7 @@ import {
   IconChevronRight,
   IconClose,
   IconDashboard,
+  IconArchive,
   IconNewPost,
   IconPosts,
   IconUsers,
@@ -44,6 +45,7 @@ const mainNav = [
 
 const contentNav = [
   { href: "/posts/current", label: "Актуальные посты", Icon: IconPosts },
+  { href: "/posts/archive", label: "Архив постов", Icon: IconArchive },
   { href: "/posts/new", label: "Новый пост", Icon: IconNewPost },
 ] as const;
 

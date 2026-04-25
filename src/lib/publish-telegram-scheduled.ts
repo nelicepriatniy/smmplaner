@@ -3,6 +3,11 @@ import { publishScheduleInstantMs } from "@/domain/smm";
 import { getAppBaseUrl } from "@/lib/app-base-url";
 import { prisma } from "@/lib/prisma";
 import { sendPostToTelegramChat } from "@/lib/telegram-send";
+import {
+  normalizeAccountTelegramChats,
+  parsePostTelegramTargetIds,
+  resolveTelegramChatIdsForTargets,
+} from "@/lib/telegram-targets";
 
 export type TelegramPublishRunSummary = {
   processed: number;
@@ -43,8 +48,16 @@ export async function publishDueTelegramScheduledPosts(
 
   const due = rows.filter((p) => {
     const token = p.socialAccount.telegramBotToken?.trim();
-    const chat = p.socialAccount.telegramChatId?.trim();
-    if (!token || !chat) return false;
+    if (!token) return false;
+    const targets = normalizeAccountTelegramChats(
+      p.socialAccount.telegramChats,
+      p.socialAccount.telegramChatId
+    );
+    if (targets.length === 0) return false;
+    let ids = parsePostTelegramTargetIds(p.telegramChatTargetIds);
+    if (ids.length === 0) ids = targets.map((t) => t.id);
+    const resolved = resolveTelegramChatIdsForTargets(targets, ids);
+    if (!resolved.ok) return false;
     return publishScheduleInstantMs(p.publishDate, p.publishTime) <= nowMs;
   });
 
@@ -53,23 +66,42 @@ export async function publishDueTelegramScheduledPosts(
   for (const post of due) {
     summary.processed += 1;
     const botToken = post.socialAccount.telegramBotToken?.trim();
-    const chatId = post.socialAccount.telegramChatId?.trim();
-    if (!botToken || !chatId) {
+    if (!botToken) {
       summary.skipped += 1;
+      continue;
+    }
+    const targets = normalizeAccountTelegramChats(
+      post.socialAccount.telegramChats,
+      post.socialAccount.telegramChatId
+    );
+    let ids = parsePostTelegramTargetIds(post.telegramChatTargetIds);
+    if (ids.length === 0) ids = targets.map((t) => t.id);
+    const resolved = resolveTelegramChatIdsForTargets(targets, ids);
+    if (!resolved.ok) {
+      summary.errors.push({ postId: post.id, error: resolved.error });
       continue;
     }
     const imageUrls = postImageUrls(post.imageUrls);
 
-    const send = await sendPostToTelegramChat({
-      botToken,
-      chatId,
-      caption: post.caption,
-      imageUrls,
-      appBaseUrl,
-    });
+    let sendOk = true;
+    let sendErr = "";
+    for (const chatId of resolved.chatIds) {
+      const send = await sendPostToTelegramChat({
+        botToken,
+        chatId,
+        caption: post.caption,
+        imageUrls,
+        appBaseUrl,
+      });
+      if (!send.ok) {
+        sendOk = false;
+        sendErr = send.error;
+        break;
+      }
+    }
 
-    if (!send.ok) {
-      summary.errors.push({ postId: post.id, error: send.error });
+    if (!sendOk) {
+      summary.errors.push({ postId: post.id, error: sendErr });
       continue;
     }
 
@@ -104,6 +136,7 @@ export async function publishDueTelegramScheduledPosts(
   if (summary.published > 0) {
     revalidatePath("/");
     revalidatePath("/posts/current");
+    revalidatePath("/posts/archive");
     revalidatePath("/calendar");
     revalidatePath("/clients");
     for (const clientId of revalidateClientIds) {

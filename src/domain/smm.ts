@@ -1,4 +1,9 @@
 import type { PostReviewComment } from "@/components/posts/postReviewTypes";
+import type { TelegramChatTarget } from "@/lib/telegram-targets";
+import {
+  labelsForSelectedTargets,
+  normalizeAccountTelegramChats,
+} from "@/lib/telegram-targets";
 import type { PostType } from "@/types/postType";
 
 export const H_MS = 60 * 60 * 1000;
@@ -46,6 +51,8 @@ export type ClientSocialAccountRecord = {
   facebookPageId?: string | null;
   businessAccountConfirmed?: boolean;
   telegramChatId?: string | null;
+  /** Несколько чатов с подписью; пустой массив — только legacy `telegramChatId`. */
+  telegramChats?: TelegramChatTarget[];
   hasTelegramBotToken?: boolean;
   vkOwnerId?: string | null;
   vkFromGroup?: boolean;
@@ -80,8 +87,14 @@ export function clientPlatformName(platform: ClientPlatform): string {
 /** Метка аккаунта без имени клиента (селект «соцсеть»). */
 export function socialAccountShortLabel(account: ClientSocialAccountRecord): string {
   if (account.platform === "telegram") {
-    const chat = account.telegramChatId?.trim();
-    return chat ? `Telegram · ${chat}` : "Telegram";
+    const targets = normalizeAccountTelegramChats(
+      account.telegramChats,
+      account.telegramChatId
+    );
+    if (targets.length === 0) return "Telegram";
+    const names = targets.map((t) => (t.name.trim() ? t.name : t.chatId)).join(", ");
+    const short = names.length > 48 ? `${names.slice(0, 45)}…` : names;
+    return `Telegram · ${short}`;
   }
   if (account.platform === "vk") {
     const wall = account.vkOwnerId?.trim();
@@ -123,7 +136,12 @@ export function postCalendarShortHandle(
     client?.socialAccounts.find((s) => s.id === post.socialAccountId) ??
     client?.socialAccounts[0];
   if (!acc) return post.clientId.slice(0, 8);
-  if (acc.platform === "telegram") return acc.telegramChatId?.trim() || "TG";
+  if (acc.platform === "telegram") {
+    const targets = normalizeAccountTelegramChats(acc.telegramChats, acc.telegramChatId);
+    if (targets.length === 0) return "TG";
+    const names = targets.map((t) => t.name.trim() || t.chatId).join(", ");
+    return names.length > 40 ? `${names.slice(0, 37)}…` : names;
+  }
   if (acc.platform === "vk") return acc.vkOwnerId?.trim() || "VK";
   if (acc.platform === "facebook")
     return acc.instagramUsername.trim() || acc.facebookPageId?.trim() || "FB";
@@ -136,19 +154,36 @@ export type PostPublisherPreview = {
   platform: ClientPlatform;
   instagramUsername: string;
   telegramChatId?: string | null;
+  /** Подзаголовок в превью Telegram: выбранные чаты или список целей. */
+  telegramSubtitle?: string | null;
   vkOwnerId?: string | null;
 };
 
 export function toPostPublisherPreview(
   client: ClientRecord | null,
-  account: ClientSocialAccountRecord | null
+  account: ClientSocialAccountRecord | null,
+  telegramChatTargetIds?: string[] | null
 ): PostPublisherPreview | null {
   if (!client || !account) return null;
+  const targets =
+    account.platform === "telegram"
+      ? normalizeAccountTelegramChats(account.telegramChats, account.telegramChatId)
+      : [];
+  const sel = telegramChatTargetIds?.filter(Boolean) ?? [];
+  const telegramSubtitle =
+    account.platform === "telegram"
+      ? sel.length > 0
+        ? labelsForSelectedTargets(targets, sel) ||
+          account.telegramChatId?.trim() ||
+          null
+        : targets.map((t) => t.name.trim() || t.chatId).join(", ") || null
+      : null;
   return {
     fullName: client.fullName,
     platform: account.platform,
     instagramUsername: account.instagramUsername,
     telegramChatId: account.telegramChatId,
+    telegramSubtitle,
     vkOwnerId: account.vkOwnerId,
   };
 }
@@ -173,7 +208,12 @@ export function clientCalendarShortHandle(
   if (!client) return fallbackId;
   const acc = account ?? client.socialAccounts[0];
   if (!acc) return fallbackId;
-  if (acc.platform === "telegram") return acc.telegramChatId?.trim() || "TG";
+  if (acc.platform === "telegram") {
+    const targets = normalizeAccountTelegramChats(acc.telegramChats, acc.telegramChatId);
+    if (targets.length === 0) return "TG";
+    const names = targets.map((t) => t.name.trim() || t.chatId).join(", ");
+    return names.length > 40 ? `${names.slice(0, 37)}…` : names;
+  }
   if (acc.platform === "vk") return acc.vkOwnerId?.trim() || "VK";
   if (acc.platform === "facebook")
     return acc.instagramUsername.trim() || acc.facebookPageId?.trim() || "FB";
@@ -201,6 +241,8 @@ export type PostDraftRecord = {
   clientId: string;
   /** Выбранная соцсеть публикации. */
   socialAccountId: string;
+  /** Id целей из `telegramChats` аккаунта (только Telegram). */
+  telegramChatTargetIds: string[];
   socialAccount: ClientSocialAccountRecord;
   status: PostDraftStatus;
   postType: PostType;
@@ -227,6 +269,7 @@ export function postDraftToEditorInitial(
   return {
     clientId: draft.clientId,
     socialAccountId: draft.socialAccountId,
+    telegramChatTargetIds: draft.telegramChatTargetIds,
     postType: draft.postType,
     caption: draft.caption,
     location: draft.location,
@@ -238,14 +281,21 @@ export function postDraftToEditorInitial(
   };
 }
 
-/** Момент публикации по строкам даты/времени из редактора (календарь, Europe/Moscow). */
+/**
+ * Часовой пояс плановой даты/времени в БД, cron публикации и полей ввода в редакторе.
+ * Календарная дата и «настенные» часы — как в Москве (без перевода на летнее время).
+ */
+export const PUBLISH_SCHEDULE_TZ = "Europe/Moscow" as const;
+const PUBLISH_SCHEDULE_OFFSET = "+03:00" as const;
+
+/** Момент публикации по строкам даты/времени из редактора. */
 export function publishScheduleInstantMs(
   publishDate: string,
   publishTime: string
 ): number {
   const t =
     publishTime.length === 5 ? `${publishTime}:00` : publishTime;
-  return Date.parse(`${publishDate}T${t}+03:00`);
+  return Date.parse(`${publishDate}T${t}${PUBLISH_SCHEDULE_OFFSET}`);
 }
 
 export function scheduledPublishMs(post: PostDraftRecord): number {

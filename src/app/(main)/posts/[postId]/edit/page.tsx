@@ -84,11 +84,12 @@ export default async function EditPostPage({ params, searchParams }: PageProps) 
       </header>
 
       <NewPostEditor
-        key={postId}
+        key={`${postId}:${(draft.telegramChatTargetIds ?? []).join(",")}`}
         clients={clients}
         existingPostId={postId}
         existingPostStatus={draft.status}
         initialValues={initialValues}
+        savedTelegramChatTargetIds={draft.telegramChatTargetIds}
       />
     </main>
   );

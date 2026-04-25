@@ -88,8 +88,10 @@ model ClientSocialAccount {
   businessAccountConfirmed Boolean       @default(false) @map("business_account_confirmed")
   /// Токен бота от @BotFather (секрет); для отправки в Telegram Bot API.
   telegramBotToken        String?        @map("telegram_bot_token") @db.Text
-  /// ID чата/канала, куда отправлять посты.
+  /// ID чата/канала (устар.: дублирует первый элемент `telegramChats` для совместимости).
   telegramChatId          String?        @map("telegram_chat_id") @db.Text
+  /// JSON: [{ "id", "name", "chatId" }, …] — несколько чатов/каналов с подписью для выбора в постах.
+  telegramChats           Json?          @map("telegram_chats")
   /// Токен пользователя или сообщества ВК для вызова API (секрет).
   vkAccessToken           String?        @map("vk_access_token") @db.Text
   /// owner_id для wall.post: отрицательный — стена сообщества, положительный — пользователя.
@@ -119,6 +121,8 @@ model Post {
   imageUrls               Json             @map("image_urls")
   publishDate             String           @map("publish_date")
   publishTime             String           @map("publish_time")
+  /// JSON: id целей из `telegram_chats` аккаунта — в какие чаты отправить (один или несколько).
+  telegramChatTargetIds   Json?            @map("telegram_chat_target_ids")
   createdAt               DateTime         @map("created_at")
   clientReviewToken       String           @unique @map("client_review_token")
 

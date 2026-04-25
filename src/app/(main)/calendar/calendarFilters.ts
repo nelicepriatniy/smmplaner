@@ -80,3 +80,8 @@ export const CALENDAR_STATUS_OPTIONS: readonly {
   id,
   label: POST_DRAFT_STATUS_LABELS[id],
 }));
+
+/** Для страницы «Актуальные посты»: опубликованные вынесены в архив. */
+export const CURRENT_POSTS_STATUS_FILTER_OPTIONS = CALENDAR_STATUS_OPTIONS.filter(
+  (o) => o.id !== "published",
+);

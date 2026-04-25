@@ -13,7 +13,10 @@ import {
   updateClientSocialAccountAction,
 } from "@/app/(main)/clients/actions";
 import type { ClientPlatform, ClientSocialAccountRecord } from "@/domain/smm";
+import { TelegramChatsEditor, newTargetRow } from "@/components/clients/TelegramChatsEditor";
 import { VkIdTokenButton } from "@/components/clients/VkIdTokenButton";
+import type { TelegramChatTarget } from "@/lib/telegram-targets";
+import { normalizeAccountTelegramChats } from "@/lib/telegram-targets";
 
 const inputClass =
   "w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3.5 py-2.5 text-[15px] text-[var(--foreground)] outline-offset-2 focus:border-[color-mix(in_srgb,var(--accent)_50%,var(--border))] focus:ring-2 focus:ring-[var(--accent-soft)]";
@@ -36,7 +39,7 @@ type SocialFormState = {
   pageAccessToken: string;
   businessAccountConfirmed: boolean;
   telegramBotToken: string;
-  telegramChatId: string;
+  telegramChats: TelegramChatTarget[];
   vkWallKind: VkWallKind;
   vkWallEntityId: string;
   vkFromGroup: boolean;
@@ -68,7 +71,10 @@ function initialSocialState(
       pageAccessToken: "",
       businessAccountConfirmed: account.businessAccountConfirmed ?? false,
       telegramBotToken: "",
-      telegramChatId: account.telegramChatId ?? "",
+      telegramChats:
+        account.platform === "telegram"
+          ? normalizeAccountTelegramChats(account.telegramChats, account.telegramChatId)
+          : [],
       vkWallKind: vkWallKindFromAccount(account),
       vkWallEntityId: vkEntityIdFromAccount(account),
       vkFromGroup: account.vkFromGroup ?? false,
@@ -83,7 +89,7 @@ function initialSocialState(
     pageAccessToken: "",
     businessAccountConfirmed: false,
     telegramBotToken: "",
-    telegramChatId: "",
+    telegramChats: [newTargetRow()],
     vkWallKind: "group",
     vkWallEntityId: "",
     vkFromGroup: true,
@@ -224,7 +230,13 @@ function SocialFormBody({
                   }`}
                   aria-checked={values.platform === "telegram"}
                   role="radio"
-                  onClick={() => setField("platform", "telegram")}
+                  onClick={() => {
+                    setValues((p) => ({
+                      ...p,
+                      platform: "telegram",
+                      telegramChats: p.telegramChats.length ? p.telegramChats : [newTargetRow()],
+                    }));
+                  }}
                 >
                   Telegram
                 </button>
@@ -510,21 +522,15 @@ function SocialFormBody({
                 ) : null}
               </div>
               <div>
-                <label
-                  htmlFor={`${formId}-tgchat`}
-                  className="text-[14px] font-medium text-[var(--foreground)]"
-                >
-                  ID чата для постов
-                </label>
-                <input
-                  id={`${formId}-tgchat`}
-                  name="telegramChatId"
-                  className={`mt-2 ${inputClass} font-mono text-[14px]`}
-                  value={values.telegramChatId}
-                  onChange={(e) => setField("telegramChatId", e.target.value)}
-                  required
-                  autoComplete="off"
-                />
+                <span className="text-[14px] font-medium text-[var(--foreground)]">
+                  Чаты для публикации
+                </span>
+                <div className="mt-2">
+                  <TelegramChatsEditor
+                    value={values.telegramChats}
+                    onChange={(next) => setField("telegramChats", next)}
+                  />
+                </div>
               </div>
             </>
           ) : (

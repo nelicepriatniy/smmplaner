@@ -5,6 +5,12 @@ import type { ClientPlatform as DbClientPlatform, Prisma } from "@prisma/client"
 import { auth } from "@/auth";
 import { deletePostUploadedImageFiles } from "@/lib/post-upload-files";
 import { prisma } from "@/lib/prisma";
+import {
+  firstTelegramChatIdForLegacyColumn,
+  parseTelegramChatsJson,
+  targetsToJsonForDb,
+  type TelegramChatTarget,
+} from "@/lib/telegram-targets";
 
 const TG_INSTAGRAM_PLACEHOLDER = "telegram";
 const VK_INSTAGRAM_PLACEHOLDER = "vk";
@@ -59,10 +65,45 @@ type SocialCreateInput = {
   businessAccountConfirmed: boolean;
   telegramBotToken: string | null;
   telegramChatId: string | null;
+  telegramChats: TelegramChatTarget[];
   vkAccessToken: string | null;
   vkOwnerId: string | null;
   vkFromGroup: boolean;
 };
+
+function parseTelegramChatsFromFormData(
+  formData: FormData
+):
+  | { ok: true; targets: TelegramChatTarget[] }
+  | { ok: false; error: string } {
+  const raw = String(formData.get("telegramChatsJson") ?? "").trim();
+  if (!raw) {
+    return {
+      ok: false,
+      error: "Добавьте хотя бы один чат Telegram (название и ID чата).",
+    };
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { ok: false, error: "Некорректный JSON списка чатов Telegram." };
+  }
+  const targets = parseTelegramChatsJson(parsed)
+    .map((t) => ({
+      id: t.id.trim(),
+      name: (t.name.trim() || t.chatId.trim()).trim(),
+      chatId: t.chatId.trim(),
+    }))
+    .filter((t) => t.id && t.chatId);
+  if (targets.length === 0) {
+    return {
+      ok: false,
+      error: "Для каждого чата Telegram укажите непустой ID (и сохраните строку в JSON).",
+    };
+  }
+  return { ok: true, targets };
+}
 
 function parseFirstSocialAccountFromForm(
   formData: FormData,
@@ -76,13 +117,16 @@ function parseFirstSocialAccountFromForm(
 
   if (platform === "telegram") {
     const telegramBotTokenRaw = String(formData.get("telegramBotToken") ?? "").trim();
-    const telegramChatId = String(formData.get("telegramChatId") ?? "").trim() || null;
     const telegramBotToken =
       telegramBotTokenRaw ||
       (mode === "update" && existingTelegramToken?.trim() ? existingTelegramToken : null);
-    if (!telegramBotToken || !telegramChatId) {
-      return { ok: false, error: "Для Telegram укажите токен бота и ID чата." };
+    const chatsRes = parseTelegramChatsFromFormData(formData);
+    if (!chatsRes.ok) return chatsRes;
+    if (!telegramBotToken) {
+      return { ok: false, error: "Для Telegram укажите токен бота." };
     }
+    const telegramChats = chatsRes.targets;
+    const telegramChatId = firstTelegramChatIdForLegacyColumn(telegramChats);
     return {
       ok: true,
       data: {
@@ -94,6 +138,7 @@ function parseFirstSocialAccountFromForm(
         businessAccountConfirmed: false,
         telegramBotToken,
         telegramChatId,
+        telegramChats,
         vkAccessToken: null,
         vkOwnerId: null,
         vkFromGroup: false,
@@ -122,6 +167,7 @@ function parseFirstSocialAccountFromForm(
         businessAccountConfirmed: false,
         telegramBotToken: null,
         telegramChatId: null,
+        telegramChats: [],
         vkAccessToken,
         vkOwnerId: vk.vkOwnerId,
         vkFromGroup: vk.vkFromGroup,
@@ -167,6 +213,7 @@ function parseFirstSocialAccountFromForm(
         businessAccountConfirmed,
         telegramBotToken: null,
         telegramChatId: null,
+        telegramChats: [],
         vkAccessToken: null,
         vkOwnerId: null,
         vkFromGroup: false,
@@ -199,6 +246,7 @@ function parseFirstSocialAccountFromForm(
       businessAccountConfirmed,
       telegramBotToken: null,
       telegramChatId: null,
+      telegramChats: [],
       vkAccessToken: null,
       vkOwnerId: null,
       vkFromGroup: false,
@@ -233,7 +281,7 @@ export async function createClientAction(
   const s = parsed.data;
   const activityDetail =
     s.platform === "telegram"
-      ? `${fullName} (Telegram, чат ${s.telegramChatId})`
+      ? `${fullName} (Telegram: ${s.telegramChats.map((t) => t.name || t.chatId).join(", ")})`
       : s.platform === "vk"
         ? `${fullName} (ВКонтакте, стена ${s.vkOwnerId})`
         : s.platform === "facebook"
@@ -261,6 +309,10 @@ export async function createClientAction(
           businessAccountConfirmed: s.businessAccountConfirmed,
           telegramBotToken: s.telegramBotToken,
           telegramChatId: s.telegramChatId,
+          telegramChats:
+            s.platform === "telegram" && s.telegramChats.length
+              ? (targetsToJsonForDb(s.telegramChats) as Prisma.InputJsonValue)
+              : undefined,
           vkAccessToken: s.vkAccessToken,
           vkOwnerId: s.vkOwnerId,
           vkFromGroup: s.vkFromGroup,
@@ -391,6 +443,10 @@ export async function addClientSocialAccountAction(
         businessAccountConfirmed: s.businessAccountConfirmed,
         telegramBotToken: s.telegramBotToken,
         telegramChatId: s.telegramChatId,
+        telegramChats:
+          s.platform === "telegram" && s.telegramChats.length
+            ? (targetsToJsonForDb(s.telegramChats) as Prisma.InputJsonValue)
+            : undefined,
         vkAccessToken: s.vkAccessToken,
         vkOwnerId: s.vkOwnerId,
         vkFromGroup: s.vkFromGroup,
@@ -468,11 +524,10 @@ export async function updateClientSocialAccountAction(
       return { ok: false, error: "Укажите Page access token." };
     }
   } else if (platform === "telegram") {
-    const telegramChatId = String(formData.get("telegramChatId") ?? "").trim() || null;
-    if (!telegramChatId) {
-      return { ok: false, error: "Для Telegram укажите ID чата." };
-    }
-    data.telegramChatId = telegramChatId;
+    const chatsRes = parseTelegramChatsFromFormData(formData);
+    if (!chatsRes.ok) return chatsRes;
+    data.telegramChats = targetsToJsonForDb(chatsRes.targets) as Prisma.InputJsonValue;
+    data.telegramChatId = firstTelegramChatIdForLegacyColumn(chatsRes.targets);
     const telegramBotTokenRaw = String(formData.get("telegramBotToken") ?? "").trim();
     if (telegramBotTokenRaw) {
       data.telegramBotToken = telegramBotTokenRaw;
@@ -586,6 +641,7 @@ export async function deleteClientAction(
     revalidatePath("/calendar");
     revalidatePath("/posts/new");
     revalidatePath("/posts/current");
+    revalidatePath("/posts/archive");
     return { ok: true };
   } catch (e) {
     console.error(e);

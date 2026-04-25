@@ -327,8 +327,8 @@ export function ClientDetailView({
             {client.fullName}
           </h1>
 
-          <div className="mt-5 grid min-w-0 gap-6 lg:mt-6 lg:grid-cols-[minmax(0,17.5rem)_minmax(0,1fr)] lg:items-start lg:gap-8">
-            <aside className="min-w-0 space-y-4 lg:max-w-[18rem]">
+          <div className="mt-5 grid min-w-0 gap-6 lg:mt-6 lg:grid-cols-[minmax(0,calc(17.5rem+100px))_minmax(0,1fr)] lg:items-start lg:gap-8">
+            <aside className="min-w-0 w-full max-w-full space-y-4">
               <div>
                 <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
                   Соцсети

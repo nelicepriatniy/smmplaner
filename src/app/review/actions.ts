@@ -13,6 +13,7 @@ function revalidateForPost(
   revalidatePath(`/review/${encodeURIComponent(token)}`);
   revalidatePath("/");
   revalidatePath("/posts/current");
+  revalidatePath("/posts/archive");
   revalidatePath(`/posts/${postId}/discussion`);
   revalidatePath(`/clients/${clientId}`);
 }
