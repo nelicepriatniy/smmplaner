@@ -20,6 +20,12 @@ export default auth((request) => {
     if (pathname.startsWith("/review/")) {
       return NextResponse.next();
     }
+    if (
+      pathname === "/api/uploads/view" ||
+      pathname.startsWith("/api/uploads/view/")
+    ) {
+      return NextResponse.next();
+    }
     if (pathname.startsWith("/api/cron/")) {
       return NextResponse.next();
     }

@@ -3,19 +3,10 @@ import { mkdir, writeFile } from "fs/promises";
 import { join } from "path";
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { extFromBuffer, pickImageExtension } from "@/lib/uploadImageFormat";
 
 const MAX_BYTES = 12 * 1024 * 1024; // на файл
 const MAX_FILES = 10;
-
-function extForMime(mime: string): string {
-  const m = mime.toLowerCase();
-  if (m === "image/jpeg" || m === "image/jpg") return ".jpg";
-  if (m === "image/png") return ".png";
-  if (m === "image/webp") return ".webp";
-  if (m === "image/gif") return ".gif";
-  if (m === "image/avif") return ".avif";
-  return ".bin";
-}
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -49,22 +40,29 @@ export async function POST(request: Request) {
   const urls: string[] = [];
 
   for (const file of files) {
-    if (!file.type.startsWith("image/")) {
-      return NextResponse.json(
-        { error: `Недопустимый тип файла: ${file.type || "—"}` },
-        { status: 400 }
-      );
-    }
     if (file.size > MAX_BYTES) {
       return NextResponse.json(
         { error: `Файл «${file.name}» слишком большой (макс. ${MAX_BYTES / 1024 / 1024} МБ).` },
         { status: 400 }
       );
     }
-
-    const ext = extForMime(file.type);
-    const name = `${Date.now()}-${randomBytes(10).toString("hex")}${ext}`;
+    const mime = file.type.trim().toLowerCase();
+    if (mime && !mime.startsWith("image/")) {
+      return NextResponse.json(
+        { error: `Недопустимый тип файла: ${file.type || "—"}` },
+        { status: 400 }
+      );
+    }
     const buf = Buffer.from(await file.arrayBuffer());
+    if (!mime && !extFromBuffer(buf)) {
+      return NextResponse.json(
+        { error: "Не удалось определить изображение (пустой MIME и неизвестный формат файла)." },
+        { status: 400 },
+      );
+    }
+
+    const ext = pickImageExtension(file, buf);
+    const name = `${Date.now()}-${randomBytes(10).toString("hex")}${ext}`;
     await writeFile(join(dir, name), buf);
     urls.push(`/uploads/posts/${userId}/${name}`);
   }

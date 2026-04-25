@@ -47,6 +47,36 @@ function isAppUploadPath(pathname: string): boolean {
 }
 
 /**
+ * Старые загрузки с расширением `.bin` отдаются как `application/octet-stream` из `public/` —
+ * в `<img>` не показываются. Подменяем на API, который отдаёт байты с корректным `Content-Type`
+ * по сигнатуре файла.
+ */
+export function rewriteBinUploadImageUrl(url: string): string {
+  const s = url.trim();
+  if (!s.toLowerCase().endsWith(".bin")) return s;
+  let pathname: string;
+  let originPrefix = "";
+  try {
+    if (s.startsWith("//")) {
+      const u = new URL(`https:${s}`);
+      pathname = u.pathname;
+      originPrefix = u.origin;
+    } else if (s.startsWith("/")) {
+      pathname = (s.split("?")[0] ?? s).trim();
+    } else {
+      const u = new URL(s);
+      pathname = u.pathname;
+      originPrefix = u.origin;
+    }
+  } catch {
+    return s;
+  }
+  if (!pathname.toLowerCase().startsWith("/uploads/posts/")) return s;
+  const api = `/api/uploads/view?p=${encodeURIComponent(pathname)}`;
+  return originPrefix ? `${originPrefix}${api}` : api;
+}
+
+/**
  * URL для `<img>`: относительные `/uploads/…` → абсолютные на текущий сайт;
  * полные URL с localhost (часто из дев-БД) и «чужой» хост при том же пути `/uploads/posts/…` → на `origin`.
  * Внешние CDN (другой путь) не трогаем.
@@ -59,41 +89,42 @@ export function toAbsoluteMediaSrc(
   const s = src.trim();
   if (!s) return s;
 
+  let resolved: string;
+
   if (s.startsWith("//")) {
     const ol = o.toLowerCase();
-    if (ol.startsWith("http:")) return `http:${s}`;
-    return `https:${s}`;
-  }
-
-  if (s.startsWith("/")) {
-    return o ? `${o}${s}` : s;
-  }
-
-  let parsed: URL;
-  try {
-    parsed = new URL(s);
-  } catch {
-    return s;
-  }
-
-  const path = `${parsed.pathname}${parsed.search}${parsed.hash}`;
-
-  if (o && isLoopbackHost(parsed.hostname)) {
-    return `${o}${path}`;
-  }
-
-  if (o && isAppUploadPath(parsed.pathname)) {
+    resolved = ol.startsWith("http:") ? `http:${s}` : `https:${s}`;
+  } else if (s.startsWith("/")) {
+    resolved = o ? `${o}${s}` : s;
+  } else {
+    let parsed: URL;
     try {
-      const base = new URL(o);
-      if (parsed.hostname !== base.hostname) {
-        return `${o}${path}`;
-      }
+      parsed = new URL(s);
     } catch {
-      /* leave as-is */
+      return s;
+    }
+
+    const path = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+
+    if (o && isLoopbackHost(parsed.hostname)) {
+      resolved = `${o}${path}`;
+    } else if (o && isAppUploadPath(parsed.pathname)) {
+      try {
+        const base = new URL(o);
+        if (parsed.hostname !== base.hostname) {
+          resolved = `${o}${path}`;
+        } else {
+          resolved = s;
+        }
+      } catch {
+        resolved = s;
+      }
+    } else {
+      resolved = s;
     }
   }
 
-  return s;
+  return rewriteBinUploadImageUrl(resolved);
 }
 
 export function toAbsoluteMediaUrls(
