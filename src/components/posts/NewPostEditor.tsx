@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useId, useMemo, useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   createDraftPostAction,
@@ -11,8 +19,7 @@ import {
   updatePostAction,
 } from "@/app/(main)/posts/actions";
 import {
-  clientSocialSelectLabel,
-  socialAccountShortLabel,
+  clientPlatformName,
   toPostPublisherPreview,
   type ClientPlatform,
   type ClientRecord,
@@ -24,6 +31,7 @@ import {
   POST_TYPE_OPTIONS,
   type PostType,
 } from "@/types/postType";
+import { SocialPlatformIcon } from "@/components/icons/SocialPlatformIcon";
 import { InstagramPostPreview } from "./InstagramPostPreview";
 import { TelegramPostPreview } from "./TelegramPostPreview";
 import { useAppNotifications } from "@/components/notifications/AppNotifications";
@@ -153,6 +161,7 @@ export function NewPostEditor({
   );
   const [scheduleTick, setScheduleTick] = useState(0);
   const scheduleId = useId();
+  const mediaInputId = useId();
   const minDateYmd = useMemo(
     () => getTodayYmdString(new Date()),
     [scheduleTick]
@@ -458,6 +467,13 @@ export function NewPostEditor({
 
   const publishBusy = isSaving || isDeleting || isPublishing;
 
+  const tabInactive =
+    "border-[var(--border)] bg-[var(--background)] text-[var(--muted)] hover:border-[color-mix(in_srgb,var(--foreground)_12%,var(--border))] hover:text-[var(--foreground)]";
+  const tabActive =
+    "border-[color-mix(in_srgb,var(--accent)_45%,var(--border))] bg-[var(--surface-elevated)] text-[var(--foreground)]";
+  const tabFocus =
+    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]";
+
   return (
     <div className="grid w-full gap-10 py-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,26.25rem)] lg:items-start">
       <section
@@ -483,93 +499,121 @@ export function NewPostEditor({
           ) : (
             <>
               <p className="text-[13px] text-[var(--muted)]">
-                Платформа и предпросмотр определяются выбранной соцсетью.
-                {isEditMode ? " Клиент и соцсеть поста не меняются." : null}
+                Платформа и предпросмотр — по выбранной соцсети.
+                {isEditMode ? " Клиент и соцсеть не меняются." : null}
               </p>
 
-              <div>
-                <label
-                  htmlFor="post-client"
-                  className="text-[14px] font-medium text-[var(--foreground)]"
-                >
-                  Клиент
-                </label>
-                <select
-                  id="post-client"
-                  className="mt-2 w-full"
-                  value={clientId}
-                  disabled={ro || pool.length === 0 || isEditMode}
-                  onChange={(e) => {
-                    const id = e.target.value;
-                    setClientId(id);
-                    const c = clients.find((x) => x.id === id);
-                    setSocialAccountId(c?.socialAccounts[0]?.id ?? "");
-                  }}
-                >
-                  {pool.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.fullName}
-                    </option>
-                  ))}
-                </select>
+              <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
+                {/* Клиент + соцсети всегда в одну строку (табы соцсетей — flex-nowrap + scroll). */}
+                <div className="flex min-w-0 max-w-full flex-[0_1_auto] flex-nowrap items-end gap-3 sm:gap-4">
+                  <div className="w-[min(100%,14rem)] shrink-0">
+                    <label
+                      htmlFor="post-client"
+                      className="text-[14px] font-medium text-[var(--foreground)]"
+                    >
+                      Клиент
+                    </label>
+                    <select
+                      id="post-client"
+                      className="mt-1.5 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-[14px] text-[var(--foreground)] outline-offset-2 focus:border-[color-mix(in_srgb,var(--accent)_50%,var(--border))] focus:ring-2 focus:ring-[var(--accent-soft)]"
+                      value={clientId}
+                      disabled={ro || pool.length === 0 || isEditMode}
+                      onChange={(e) => {
+                        const id = e.target.value;
+                        setClientId(id);
+                        const c = clients.find((x) => x.id === id);
+                        setSocialAccountId(c?.socialAccounts[0]?.id ?? "");
+                      }}
+                    >
+                      {pool.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.fullName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="min-w-0 max-w-[min(100%,calc(100vw-2.5rem))] sm:max-w-none">
+                    <span
+                      id="post-social-tabs-label"
+                      className="text-[14px] font-medium text-[var(--foreground)]"
+                    >
+                      Соцсеть
+                    </span>
+                    <div
+                      role="tablist"
+                      aria-labelledby="post-social-tabs-label"
+                      className="mt-1.5 flex max-w-full flex-nowrap gap-2 overflow-x-auto pb-0.5 [-webkit-overflow-scrolling:touch] [scrollbar-width:thin]"
+                    >
+                      {socialOptions.map((s) => {
+                        const selected = s.id === socialAccountId;
+                        return (
+                          <button
+                            key={s.id}
+                            type="button"
+                            role="tab"
+                            aria-selected={selected}
+                            disabled={ro || !socialOptions.length || isEditMode}
+                            onClick={() => setSocialAccountId(s.id)}
+                            className={`inline-flex shrink-0 items-center gap-2 rounded-xl border px-2.5 py-2 text-left text-[13px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${tabFocus} ${
+                              selected ? tabActive : tabInactive
+                            }`}
+                          >
+                            <SocialPlatformIcon
+                              platform={s.platform}
+                              className="size-4 shrink-0"
+                            />
+                            <span className="max-w-[11rem] truncate sm:max-w-[14rem]">
+                              {clientPlatformName(s.platform)}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* При нехватке места на строке уходит вниз (flex-basis + wrap). */}
+                {graphFeedEditor ? (
+                  <div className="min-w-0 flex-[1_1_17.5rem]">
+                    <span className="text-[14px] font-medium text-[var(--foreground)]">
+                      Тип публикации
+                    </span>
+                    <div
+                      role="tablist"
+                      aria-label="Тип публикации"
+                      className="mt-1.5 flex flex-wrap gap-2"
+                    >
+                      {POST_TYPE_OPTIONS.map((o) => {
+                        const selected = postType === o.value;
+                        return (
+                          <button
+                            key={o.value}
+                            type="button"
+                            role="tab"
+                            aria-selected={selected}
+                            disabled={ro}
+                            onClick={() => setPostType(o.value)}
+                            className={`rounded-xl border px-3 py-2 text-[13px] font-medium transition-colors disabled:opacity-50 ${tabFocus} ${
+                              selected ? tabActive : tabInactive
+                            }`}
+                          >
+                            {o.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
               </div>
 
-              <div>
-                <label
-                  htmlFor="post-social"
-                  className="text-[14px] font-medium text-[var(--foreground)]"
-                >
-                  Соцсеть
-                </label>
-                <select
-                  id="post-social"
-                  className="mt-2 w-full"
-                  value={socialAccountId}
-                  disabled={ro || !socialOptions.length || isEditMode}
-                  onChange={(e) => setSocialAccountId(e.target.value)}
-                >
-                  {socialOptions.length === 0 ? (
-                    <option value="">Нет подключённых сетей</option>
-                  ) : (
-                    socialOptions.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {selectedClient
-                          ? clientSocialSelectLabel(selectedClient, s)
-                          : socialAccountShortLabel(s)}
-                      </option>
-                    ))
-                  )}
-                </select>
-              </div>
+              {graphFeedEditor ? (
+                <p className="mt-2 text-[13px] leading-snug text-[var(--muted)]">
+                  {typeHint?.description}
+                </p>
+              ) : null}
             </>
           )}
-
-          {graphFeedEditor ? (
-            <div>
-              <label
-                htmlFor="post-type"
-                className="text-[14px] font-medium text-[var(--foreground)]"
-              >
-                Тип публикации
-              </label>
-              <p className="mt-1 text-[13px] text-[var(--muted)]">
-                {typeHint?.description}
-              </p>
-              <select
-                id="post-type"
-                className="mt-2 w-full"
-                value={postType}
-                disabled={ro}
-                onChange={(e) => setPostType(e.target.value as PostType)}
-              >
-                {POST_TYPE_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : null}
 
           <div>
             <span
@@ -587,19 +631,67 @@ export function NewPostEditor({
                   ? "Обложка или кадр (9:16). Можно несколько кадров подряд в сторис/коллаж."
                   : "Одно или несколько изображений (карусель). Для «Фото» превью 1:1."}
             </p>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <input
+            {ro ? (
+              <div className="mt-2 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--background)] px-4 py-10 text-center text-[13px] text-[var(--muted)]">
+                Загрузка недоступна для опубликованного поста.
+              </div>
+            ) : (
+              <label
+                htmlFor={mediaInputId}
                 aria-labelledby="post-images-label"
-                type="file"
-                accept="image/*"
-                multiple
-                disabled={ro || imageUploadState === "uploading"}
-                className="w-full min-w-0 text-[14px] text-[var(--muted)] file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-[var(--surface-elevated)] file:px-3.5 file:py-2 file:text-[14px] file:font-medium file:text-[var(--foreground)] hover:file:bg-[var(--border)] disabled:cursor-not-allowed disabled:opacity-50"
-                onChange={async (e) => {
-                  await setImagesFromFiles(e.target.files);
-                  e.target.value = "";
+                className={`mt-2 flex min-h-[9.5rem] cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed px-4 py-8 text-center transition-colors ${
+                  imageUploadState === "uploading"
+                    ? "pointer-events-none border-[var(--border)] bg-[var(--surface-elevated)] opacity-70"
+                    : "border-[color-mix(in_srgb,var(--foreground)_14%,var(--border))] bg-[var(--background)] hover:border-[color-mix(in_srgb,var(--accent)_40%,var(--border))] hover:bg-[var(--surface-elevated)]"
+                }`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
                 }}
-              />
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  void setImagesFromFiles(e.dataTransfer.files);
+                }}
+              >
+                <input
+                  id={mediaInputId}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  disabled={imageUploadState === "uploading"}
+                  className="sr-only"
+                  onChange={async (e) => {
+                    await setImagesFromFiles(e.target.files);
+                    e.target.value = "";
+                  }}
+                />
+                <span className="text-[var(--muted)]" aria-hidden>
+                  <svg
+                    width="40"
+                    height="40"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    className="mx-auto opacity-80"
+                    stroke="currentColor"
+                    strokeWidth="1.25"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <circle cx="8.5" cy="8.5" r="1.5" />
+                    <path d="M21 15l-5-5L5 21" />
+                  </svg>
+                </span>
+                <span className="text-[14px] font-medium text-[var(--foreground)]">
+                  Переместите или загрузите медиа
+                </span>
+                <span className="text-[12px] text-[var(--muted)]">
+                  Нажмите, чтобы выбрать файлы с устройства
+                </span>
+              </label>
+            )}
+            <div className="mt-2 flex flex-wrap items-center gap-2">
               {imageUploadState === "uploading" ? (
                 <span className="text-[13px] text-[var(--muted)]">Загрузка на сервер…</span>
               ) : null}

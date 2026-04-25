@@ -192,14 +192,6 @@ export function ClientDetailView({
     setFormOpen(false);
   }, []);
 
-  const openAddSocial = () => {
-    setSocialDialogMode("add");
-    setSocialDialogAccount(null);
-    setSocialInitialPlatform(null);
-    setSocialSession((s) => s + 1);
-    setSocialDialogOpen(true);
-  };
-
   const openAddSocialForPlatform = (platform: ClientPlatform) => {
     setSocialDialogMode("add");
     setSocialDialogAccount(null);
@@ -287,11 +279,6 @@ export function ClientDetailView({
     })();
   }, [client.fullName, client.id, confirm, router, toast]);
 
-  const newPostHref =
-    client.socialAccounts[0]
-      ? `/posts/new?client=${encodeURIComponent(client.id)}&social=${encodeURIComponent(client.socialAccounts[0].id)}`
-      : `/posts/new?client=${encodeURIComponent(client.id)}`;
-
   return (
     <main className="box-border -mx-5 mb-0 flex w-[calc(100%+2.5rem)] min-w-0 min-h-0 flex-1 flex-col self-stretch sm:-mx-8 sm:w-[calc(100%+4rem)] lg:-mx-10 lg:w-[calc(100%+5rem)]">
       <ClientFormDialog
@@ -335,15 +322,6 @@ export function ClientDetailView({
 
           <div className="mt-5 grid min-w-0 gap-6 lg:mt-6 lg:grid-cols-[minmax(0,17.5rem)_minmax(0,1fr)] lg:items-start lg:gap-8">
             <aside className="min-w-0 space-y-4 lg:max-w-[18rem]">
-              <div className="flex flex-wrap gap-2">
-                <Link href={newPostHref} className={btnSm}>
-                  Пост
-                </Link>
-                <button type="button" onClick={openAddSocial} className={btnSm}>
-                  + Соцсеть
-                </button>
-              </div>
-
               <div>
                 <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
                   Соцсети
