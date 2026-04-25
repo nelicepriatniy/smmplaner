@@ -259,10 +259,17 @@ export function ClientDetailView({
 
   const removeClient = useCallback(() => {
     void (async () => {
+      const n = clientPosts.length;
+      const postsHint =
+        n === 0
+          ? "У этого клиента нет постов в приложении."
+          : n === 1
+            ? "Сейчас у клиента 1 пост."
+            : `Сейчас у клиента ${n} постов.`;
       const ok = await confirm({
         title: "Удалить клиента",
-        message: `Удалить «${client.fullName}»? Все посты этого клиента будут удалены безвозвратно.`,
-        confirmLabel: "Удалить",
+        message: `Удалить «${client.fullName}»?\n\n${postsHint} Все они будут удалены безвозвратно: черновики, на согласовании, запланированные и уже опубликованные. Файлы изображений, загруженные в приложение (не внешние ссылки), тоже будут стёрты с сервера.`,
+        confirmLabel: "Удалить всё",
         danger: true,
       });
       if (!ok) return;
@@ -277,7 +284,7 @@ export function ClientDetailView({
         router.refresh();
       });
     })();
-  }, [client.fullName, client.id, confirm, router, toast]);
+  }, [client.fullName, client.id, clientPosts.length, confirm, router, toast]);
 
   return (
     <main className="box-border -mx-5 mb-0 flex w-[calc(100%+2.5rem)] min-w-0 min-h-0 flex-1 flex-col self-stretch sm:-mx-8 sm:w-[calc(100%+4rem)] lg:-mx-10 lg:w-[calc(100%+5rem)]">

@@ -206,7 +206,7 @@ function ConfirmOverlay({
         ) : null}
         <p
           id={descId}
-          className={`text-[14px] leading-relaxed text-[var(--foreground)] ${state.title ? "mt-2" : ""}`}
+          className={`whitespace-pre-line text-[14px] leading-relaxed text-[var(--foreground)] ${state.title ? "mt-2" : ""}`}
         >
           {state.message}
         </p>

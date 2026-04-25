@@ -5,6 +5,7 @@ import type { PostContentType, PostDraftStatus } from "@prisma/client";
 import { auth } from "@/auth";
 import { getAppBaseUrl } from "@/lib/app-base-url";
 import { newClientReviewToken } from "@/lib/clientReviewToken";
+import { deletePostUploadedImageFiles } from "@/lib/post-upload-files";
 import { prisma } from "@/lib/prisma";
 import { sendPostToTelegramChat } from "@/lib/telegram-send";
 import { sendPostToVkWall } from "@/lib/vk-wall-send";
@@ -416,6 +417,7 @@ export async function deletePostAction(postId: string): Promise<PostActionResult
   const clientId = existing.socialAccount.clientId;
 
   try {
+    await deletePostUploadedImageFiles(userId, existing.imageUrls);
     await prisma.post.delete({ where: { id: postId } });
     revalidatePostPaths(userId, postId, clientId);
     return { ok: true };

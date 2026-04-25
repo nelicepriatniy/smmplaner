@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type { ClientPlatform as DbClientPlatform, Prisma } from "@prisma/client";
 import { auth } from "@/auth";
+import { deletePostUploadedImageFiles } from "@/lib/post-upload-files";
 import { prisma } from "@/lib/prisma";
 
 const TG_INSTAGRAM_PLACEHOLDER = "telegram";
@@ -552,13 +553,26 @@ export async function deleteClientAction(
 
   const postRows = await prisma.post.findMany({
     where: { userId, socialAccount: { clientId } },
-    select: { id: true },
+    select: { id: true, imageUrls: true },
   });
+  const postIds = postRows.map((p) => p.id);
 
   try {
+    for (const p of postRows) {
+      await deletePostUploadedImageFiles(userId, p.imageUrls);
+    }
     await prisma.activity.updateMany({
       where: { userId, clientId },
       data: { clientId: null },
+    });
+    if (postIds.length > 0) {
+      await prisma.activity.updateMany({
+        where: { userId, postId: { in: postIds } },
+        data: { postId: null },
+      });
+    }
+    await prisma.post.deleteMany({
+      where: { userId, socialAccount: { clientId } },
     });
     await prisma.client.delete({ where: { id: clientId } });
 
