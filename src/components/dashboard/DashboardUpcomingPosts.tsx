@@ -1,5 +1,4 @@
-import Image from "next/image";
-import { isPublicUploadImageSrc } from "@/lib/media-display";
+import { toAbsoluteMediaSrc } from "@/lib/media-display";
 import Link from "next/link";
 import {
   POST_DRAFT_STATUS_LABELS,
@@ -63,9 +62,12 @@ function postTypeLabel(value: PostDraftRecord["postType"]) {
 export function DashboardUpcomingPosts({
   posts,
   clients,
+  mediaOrigin,
 }: {
   posts: PostDraftRecord[];
   clients: ClientRecord[];
+  /** Origin запроса — чтобы миниатюры /uploads/… грузились как абсолютные URL. */
+  mediaOrigin?: string;
 }) {
   const clientById = Object.fromEntries(clients.map((c) => [c.id, c]));
 
@@ -120,13 +122,16 @@ export function DashboardUpcomingPosts({
                   <article className="flex items-start gap-3">
                     <div className="relative mt-0.5 size-10 shrink-0 overflow-hidden rounded-lg bg-[var(--surface-elevated)] ring-1 ring-[color-mix(in_srgb,var(--foreground)_8%,transparent)] sm:size-11">
                       {thumb ? (
-                        <Image
-                          src={thumb}
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={toAbsoluteMediaSrc(
+                            thumb,
+                            mediaOrigin || undefined,
+                          )}
                           alt={post.altText || ""}
-                          fill
-                          className="object-cover"
-                          sizes="44px"
-                          unoptimized={isPublicUploadImageSrc(thumb)}
+                          className="absolute inset-0 size-full object-cover"
+                          loading="lazy"
+                          decoding="async"
                         />
                       ) : null}
                     </div>

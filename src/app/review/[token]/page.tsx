@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { ClientReviewPanel } from "@/components/posts/ClientReviewPanel";
-import { getServerRefMs } from "@/lib/serverRefMs";
 import { toPostPublisherPreview } from "@/domain/smm";
+import { getAppBaseUrl } from "@/lib/app-base-url";
+import { toAbsoluteMediaUrls } from "@/lib/media-display";
+import { getServerRefMs } from "@/lib/serverRefMs";
 import {
   getClientRecordById,
   getPostByClientReviewToken,
@@ -33,6 +36,15 @@ export default async function ClientReviewPage({ params }: PageProps) {
   const refMs = await getServerRefMs();
   const reviewToken = decodeURIComponent(token).trim();
 
+  const hdrs = await headers();
+  const host = hdrs.get("x-forwarded-host") ?? hdrs.get("host") ?? "";
+  const proto = hdrs.get("x-forwarded-proto") ?? "https";
+  const requestOrigin = host ? `${proto}://${host}` : getAppBaseUrl() ?? "";
+  const previewImageUrls = toAbsoluteMediaUrls(
+    post.imageUrls,
+    requestOrigin || undefined,
+  );
+
   return (
     <main className="min-h-dvh w-full bg-[var(--background)] px-4 py-8 sm:px-6 sm:py-10">
       <div className="mx-auto max-w-xl">
@@ -55,7 +67,7 @@ export default async function ClientReviewPage({ params }: PageProps) {
           clientReviewToken={reviewToken}
           postType={post.postType}
           publisher={publisher}
-          imageUrls={post.imageUrls}
+          imageUrls={previewImageUrls}
           caption={post.caption}
           location={post.location}
           firstComment={post.firstComment}

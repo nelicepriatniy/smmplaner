@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import Image from "next/image";
-import { isPublicUploadImageSrc } from "@/lib/media-display";
+import { toAbsoluteMediaSrc } from "@/lib/media-display";
 import Link from "next/link";
 import { Suspense } from "react";
 import { CalendarPageFilters } from "@/app/(main)/calendar/CalendarPageFilters";
@@ -21,6 +20,7 @@ import {
   type PostDraftStatus,
 } from "@/domain/smm";
 import { POST_TYPE_OPTIONS } from "@/types/postType";
+import { getAppBaseUrl } from "@/lib/app-base-url";
 import { getServerRefMs } from "@/lib/serverRefMs";
 import {
   listClientsForUser,
@@ -93,7 +93,7 @@ export default async function CurrentPostsPage({ searchParams }: PageProps) {
   const hdrs = await headers();
   const host = hdrs.get("x-forwarded-host") ?? hdrs.get("host") ?? "";
   const proto = hdrs.get("x-forwarded-proto") ?? "https";
-  const siteOrigin = host ? `${proto}://${host}` : "";
+  const siteOrigin = host ? `${proto}://${host}` : getAppBaseUrl() ?? "";
 
   const clientById = Object.fromEntries(clients.map((c) => [c.id, c]));
 
@@ -192,13 +192,13 @@ export default async function CurrentPostsPage({ searchParams }: PageProps) {
                 <article className="flex flex-col gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:flex-row sm:gap-5 sm:p-5">
                       <div className="relative size-[72px] shrink-0 self-start overflow-hidden rounded-xl bg-[var(--surface-elevated)] sm:size-[88px] sm:self-auto">
                         {thumb ? (
-                          <Image
-                            src={thumb}
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={toAbsoluteMediaSrc(thumb, siteOrigin || undefined)}
                             alt={post.altText || ""}
-                            fill
-                            className="object-cover"
-                            sizes="88px"
-                            unoptimized={isPublicUploadImageSrc(thumb)}
+                            className="absolute inset-0 size-full object-cover"
+                            loading="lazy"
+                            decoding="async"
                           />
                         ) : null}
                       </div>
