@@ -33,3 +33,32 @@ export function getMonthGridCells(
   }
   return cells;
 }
+
+/**
+ * Понедельник–воскресенье недели, в которой лежит указанный день месяца
+ * (`dayInMonth` 1–31, `monthIndex` 0–11).
+ */
+export function getWeekGridCells(
+  year: number,
+  monthIndex: number,
+  dayInMonth: number
+): CalendarDayCell[] {
+  const lastD = new Date(year, monthIndex + 1, 0).getDate();
+  const d = Math.min(Math.max(dayInMonth, 1), lastD);
+  const anchor = new Date(year, monthIndex, d);
+  const dow = anchor.getDay();
+  const offsetMon = dow === 0 ? 6 : dow - 1;
+  const start = new Date(anchor);
+  start.setDate(anchor.getDate() - offsetMon);
+  const cells: CalendarDayCell[] = [];
+  for (let i = 0; i < 7; i++) {
+    const x = new Date(start);
+    x.setDate(start.getDate() + i);
+    cells.push({
+      ymd: toLocalYmd(x),
+      inMonth: x.getMonth() === monthIndex,
+      dayNumber: x.getDate(),
+    });
+  }
+  return cells;
+}

@@ -143,36 +143,35 @@ export default async function CurrentPostsPage({ searchParams }: PageProps) {
         </p>
       </header>
 
-      <div className="w-full border-separate lg:table lg:table-fixed lg:border-spacing-x-8 xl:border-spacing-x-10">
-        <div className="flex flex-col gap-6 lg:table-row">
-          <aside className="w-full shrink-0 lg:table-cell lg:w-64 lg:max-w-64 lg:align-top xl:w-[15.5rem] xl:max-w-[15.5rem]">
-            <Suspense
-              fallback={
-                <div className="h-[220px] w-full animate-pulse rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)]/35" />
-              }
-            >
-              <div className="flex flex-col rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)]/35 p-3 sm:p-3.5">
-                <CalendarPageFilters
-                  clientOptions={filterOptions}
-                  fillColumn={false}
-                />
-              </div>
-            </Suspense>
-          </aside>
+      <Suspense
+        fallback={
+          <div
+            className="mb-6 h-10 w-full animate-pulse rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)]/50"
+            aria-hidden
+          />
+        }
+      >
+        <div className="mb-5 w-full min-w-0 border-b border-[var(--border)] pb-3 sm:mb-6">
+          <CalendarPageFilters
+            clientOptions={filterOptions}
+            direction="row"
+          />
+        </div>
+      </Suspense>
 
-          <div className="min-w-0 space-y-4 lg:table-cell lg:align-top">
-            {rows.length === 0 ? (
-              <p className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-8 text-center text-[14px] text-[var(--muted)]">
-                {hasActiveFilters
-                  ? "Нет постов, подходящих под выбранные фильтры."
-                  : "Постов пока нет. Создайте пост в разделе «Новый пост» или импортируйте демо через сид."}
-              </p>
-            ) : null}
+      <div className="min-w-0 space-y-4">
+        {rows.length === 0 ? (
+          <p className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-8 text-center text-[14px] text-[var(--muted)]">
+            {hasActiveFilters
+              ? "Нет постов, подходящих под выбранные фильтры."
+              : "Постов пока нет. Создайте пост в разделе «Новый пост» или импортируйте демо через сид."}
+          </p>
+        ) : null}
 
-            <ul
-              className={`flex flex-col gap-4 ${rows.length === 0 ? "hidden" : ""}`}
-            >
-              {rows.map((post) => {
+        <ul
+          className={`flex flex-col gap-4 ${rows.length === 0 ? "hidden" : ""}`}
+        >
+          {rows.map((post) => {
                 const client = clientById[post.clientId];
                 const thumb = post.imageUrls[0];
                 const captionPreview =
@@ -188,9 +187,9 @@ export default async function CurrentPostsPage({ searchParams }: PageProps) {
                   ? `${siteOrigin}${reviewPath}`
                   : reviewPath;
 
-                return (
-                  <li key={post.id}>
-                    <article className="flex gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:gap-5 sm:p-5">
+            return (
+              <li key={post.id}>
+                <article className="flex gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:gap-5 sm:p-5">
                       <div className="relative size-[72px] shrink-0 overflow-hidden rounded-xl bg-[var(--surface-elevated)] sm:size-[88px]">
                         {thumb ? (
                           <Image
@@ -302,14 +301,12 @@ export default async function CurrentPostsPage({ searchParams }: PageProps) {
                             Обсуждения
                           </Link>
                         </p>
-                      </div>
-                    </article>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        </div>
+                </div>
+                </article>
+              </li>
+            );
+          })}
+        </ul>
       </div>
     </main>
   );

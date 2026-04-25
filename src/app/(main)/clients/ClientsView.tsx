@@ -6,8 +6,8 @@ import { ClientFormDialog } from "@/components/clients/ClientFormDialog";
 import { ClientCard } from "@/components/clients/ClientCard";
 import type { ClientRecord } from "@/domain/smm";
 
-const btnPrimaryClass =
-  "inline-flex items-center justify-center rounded-xl border border-transparent bg-[var(--surface-elevated)] px-4 py-2.5 text-[14px] font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--border)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]";
+const btnAddClientClass =
+  "inline-flex items-center justify-center rounded-xl border border-transparent bg-[var(--accent)] px-4 py-2.5 text-[14px] font-medium text-white transition-opacity hover:opacity-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] dark:text-[#12141a]";
 
 function clientsWord(n: number) {
   const m10 = n % 10;
@@ -53,7 +53,7 @@ export function ClientsView({ clients }: { clients: ClientRecord[] }) {
               {n} {clientsWord(n)}
             </p>
           </div>
-          <button type="button" onClick={openAdd} className={btnPrimaryClass}>
+          <button type="button" onClick={openAdd} className={btnAddClientClass}>
             Добавить клиента
           </button>
         </div>

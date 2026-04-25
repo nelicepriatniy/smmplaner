@@ -81,8 +81,11 @@ export function DashboardRecentActivity({
   refMs: number;
 }) {
   return (
-    <section className="mt-8 sm:mt-10" aria-labelledby="dash-activity-heading">
-      <div className="mb-4">
+    <section
+      className="flex h-full min-h-0 flex-col"
+      aria-labelledby="dash-activity-heading"
+    >
+      <div className="mb-4 flex-shrink-0">
         <h2
           id="dash-activity-heading"
           className="text-[17px] font-semibold tracking-tight text-[var(--foreground)]"
@@ -95,11 +98,11 @@ export function DashboardRecentActivity({
       </div>
 
       {activities.length === 0 ? (
-        <p className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-6 text-center text-[14px] text-[var(--muted)]">
+        <p className="flex min-h-0 flex-1 flex-col justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-6 text-center text-[14px] text-[var(--muted)]">
           Пока нет событий для отображения.
         </p>
       ) : (
-        <ul className="flex flex-col gap-2.5">
+        <ul className="flex min-h-0 flex-1 flex-col gap-2.5">
           {activities.map((act) => {
             const meta = KIND_META[act.kind];
             const href = activityHref(act);

@@ -23,7 +23,7 @@ export default async function Home() {
     listActivitiesForUser(userId, 20, refMs),
   ]);
   const stats = computeDashboardStats(clients, posts, refMs);
-  const upcoming = getUpcomingScheduledPosts(posts, 4, refMs);
+  const upcoming = getUpcomingScheduledPosts(posts, 6, refMs);
   const recentActivity = getRecentActivities(activityRows, 8, refMs);
 
   return (
@@ -37,8 +37,17 @@ export default async function Home() {
         </p>
       </header>
       <DashboardStatsRow stats={stats} />
-      <DashboardUpcomingPosts posts={upcoming} clients={clients} />
-      <DashboardRecentActivity activities={recentActivity} refMs={refMs} />
+      <div className="mt-8 flex flex-col gap-8 sm:mt-10 lg:flex-row lg:items-stretch lg:gap-6 xl:gap-8">
+        <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
+          <DashboardUpcomingPosts posts={upcoming} clients={clients} />
+        </div>
+        <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
+          <DashboardRecentActivity
+            activities={recentActivity}
+            refMs={refMs}
+          />
+        </div>
+      </div>
     </main>
   );
 }

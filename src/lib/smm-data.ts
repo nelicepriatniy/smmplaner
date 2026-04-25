@@ -116,6 +116,7 @@ function enrichClientRecord(
     return py === y && pm === m + 1;
   }).length;
   const postsPendingReview = mine.filter((p) => p.status === "in_review").length;
+  const postsScheduled = mine.filter((p) => p.status === "scheduled").length;
 
   const socialAccounts = [...c.socialAccounts]
     .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
@@ -127,6 +128,7 @@ function enrichClientRecord(
     socialAccounts,
     postsTotal,
     postsThisMonth,
+    postsScheduled,
     postsPendingReview,
     activitySpheres: spheresTuple(c.activitySpheres),
     contact: c.contact ?? undefined,
@@ -246,6 +248,7 @@ export async function getClientRecordById(
     socialAccounts: row.socialAccounts.map(toSocialAccountRecord),
     postsTotal: 0,
     postsThisMonth: 0,
+    postsScheduled: 0,
     postsPendingReview: 0,
     activitySpheres: spheresTuple(row.activitySpheres),
     contact: row.contact ?? undefined,

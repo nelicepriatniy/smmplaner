@@ -37,8 +37,11 @@ export function DashboardUpcomingPosts({
   const clientById = Object.fromEntries(clients.map((c) => [c.id, c]));
 
   return (
-    <section className="mt-8 sm:mt-10" aria-labelledby="dash-upcoming-heading">
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+    <section
+      className="flex h-full min-h-0 flex-col"
+      aria-labelledby="dash-upcoming-heading"
+    >
+      <div className="mb-4 flex flex-shrink-0 flex-wrap items-end justify-between gap-3">
         <div>
           <h2
             id="dash-upcoming-heading"
@@ -59,11 +62,11 @@ export function DashboardUpcomingPosts({
       </div>
 
       {posts.length === 0 ? (
-        <p className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-6 text-center text-[14px] text-[var(--muted)]">
+        <p className="flex min-h-0 flex-1 flex-col justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-6 text-center text-[14px] text-[var(--muted)]">
           Нет запланированных постов после текущей отметки времени.
         </p>
       ) : (
-        <ul className="flex flex-col gap-3">
+        <ul className="flex min-h-0 flex-1 flex-col gap-3">
           {posts.map((post) => {
             const client = clientById[post.clientId];
             const socialAcc = client?.socialAccounts.find(

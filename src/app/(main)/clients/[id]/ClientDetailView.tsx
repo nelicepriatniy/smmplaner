@@ -28,6 +28,22 @@ const POST_STATUS_ORDER: PostDraftStatus[] = [
   "rejected",
 ];
 
+/** Краткая сводка: числа в цветах «инвентаря» / месяца / согласования. */
+const BRIEF_NUM_CLASS = {
+  social: "text-[color:var(--post-status-published-border)]",
+  postsTotal: "text-[color:var(--post-status-draft-border)]",
+  inMonth: "text-[color:var(--post-status-scheduled-border)]",
+  inReview: "text-[color:var(--post-status-in-review-border)]",
+} as const;
+
+const POST_STATUS_NUM_CLASS: Record<PostDraftStatus, string> = {
+  draft: "text-[color:var(--post-status-draft-border)]",
+  in_review: "text-[color:var(--post-status-in-review-border)]",
+  scheduled: "text-[color:var(--post-status-scheduled-border)]",
+  published: "text-[color:var(--post-status-published-border)]",
+  rejected: "text-[color:var(--post-status-rejected-border)]",
+};
+
 const btnSm =
   "inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-[var(--surface-elevated)] px-2.5 py-1.5 text-[12px] font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--border)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]";
 
@@ -299,7 +315,9 @@ export function ClientDetailView({
                 </h2>
                 <p className="mt-2 text-[12px] leading-snug text-[var(--muted)]">
                   Соцсетей подключено:{" "}
-                  <span className="font-semibold tabular-nums text-[var(--foreground)]">
+                  <span
+                    className={`font-semibold tabular-nums ${BRIEF_NUM_CLASS.social}`}
+                  >
                     {client.socialAccounts.length}
                   </span>
                 </p>
@@ -324,16 +342,22 @@ export function ClientDetailView({
                 ) : null}
                 <p className="mt-2 text-[12px] leading-snug text-[var(--foreground)]">
                   Постов{" "}
-                  <span className="font-semibold tabular-nums">{client.postsTotal}</span>
+                  <span
+                    className={`font-semibold tabular-nums ${BRIEF_NUM_CLASS.postsTotal}`}
+                  >
+                    {client.postsTotal}
+                  </span>
                   {" · "}
                   в месяце{" "}
-                  <span className="font-semibold tabular-nums">{client.postsThisMonth}</span>
+                  <span
+                    className={`font-semibold tabular-nums ${BRIEF_NUM_CLASS.inMonth}`}
+                  >
+                    {client.postsThisMonth}
+                  </span>
                   {" · "}
                   на соглас.{" "}
                   <span
-                    className={`font-semibold tabular-nums ${
-                      client.postsPendingReview > 0 ? "text-[var(--accent)]" : ""
-                    }`}
+                    className={`font-semibold tabular-nums ${BRIEF_NUM_CLASS.inReview}`}
                   >
                     {client.postsPendingReview}
                   </span>
@@ -348,11 +372,7 @@ export function ClientDetailView({
                         {POST_DRAFT_STATUS_LABELS[st]}
                       </span>
                       <span
-                        className={`shrink-0 tabular-nums font-medium ${
-                          st === "in_review" && postCountsByStatus[st] > 0
-                            ? "text-[var(--accent)]"
-                            : "text-[var(--foreground)]"
-                        }`}
+                        className={`shrink-0 font-medium tabular-nums ${POST_STATUS_NUM_CLASS[st]}`}
                       >
                         {postCountsByStatus[st]}
                       </span>

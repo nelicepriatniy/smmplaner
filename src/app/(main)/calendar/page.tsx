@@ -71,7 +71,7 @@ export default async function CalendarPage({ searchParams }: PageProps) {
           Календарь
         </h1>
         <p className="mt-1.5 text-[14px] text-[var(--muted)]">
-          Слоты по дням. Слева — фильтры, справа — сетка месяца.
+          Слоты по дням: фильтры, вид «месяц / неделя» и сетка.
         </p>
       </header>
 

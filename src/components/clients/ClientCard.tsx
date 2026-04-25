@@ -1,8 +1,19 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { SocialPlatformIcon } from "@/components/icons/SocialPlatformIcon";
 import type { ClientRecord } from "@/domain/smm";
-import { socialAccountShortLabel } from "@/domain/smm";
+import { clientPlatformName, socialAccountShortLabel } from "@/domain/smm";
+
+const POST_COUNT_NUM_CLASS: Record<"total" | "scheduled" | "in_review", string> =
+  {
+    total: "text-[color:var(--post-status-draft-border)]",
+    scheduled: "text-[color:var(--post-status-scheduled-border)]",
+    in_review: "text-[color:var(--post-status-in-review-border)]",
+  };
+
+const btnOpenClass =
+  "inline-flex w-full items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] px-4 py-2.5 text-[14px] font-medium text-[var(--foreground)] transition-colors hover:border-[color-mix(in_srgb,var(--accent)_28%,var(--border))] hover:bg-[var(--background)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]";
 
 type ClientCardProps = {
   client: ClientRecord;
@@ -16,23 +27,10 @@ export function ClientCard({ client }: ClientCardProps) {
   };
 
   const accounts = client.socialAccounts;
-  const primary = accounts[0];
-  const ig = primary?.platform === "instagram" ? primary.instagramUsername.trim() : "";
-  const igUrl =
-    ig && ig !== "telegram" && ig !== "vk"
-      ? `https://www.instagram.com/${encodeURIComponent(ig)}/`
-      : null;
-
-  const subtitle =
-    accounts.length === 0
-      ? "Нет подключённых соцсетей"
-      : accounts.length === 1 && primary
-        ? socialAccountShortLabel(primary)
-        : `${accounts.length} соцсети`;
 
   return (
     <article
-      className="flex h-full flex-col cursor-pointer rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-5 transition-colors hover:border-[color-mix(in_srgb,var(--accent)_28%,var(--border))] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+      className="flex h-full min-h-0 cursor-pointer flex-col rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-5 transition-colors hover:border-[color-mix(in_srgb,var(--accent)_28%,var(--border))] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
       role="link"
       tabIndex={0}
       aria-label={`${client.fullName}, подробности`}
@@ -47,64 +45,100 @@ export function ClientCard({ client }: ClientCardProps) {
       <h2 className="text-[16px] font-semibold leading-snug text-[var(--foreground)]">
         {client.fullName}
       </h2>
-      {primary?.platform === "instagram" && igUrl ? (
-        <a
-          href={igUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-          className="mt-1.5 inline-flex w-fit text-[13px] text-[var(--muted)] underline-offset-2 transition-colors hover:text-[var(--accent)] hover:underline"
-        >
-          @{ig}
-        </a>
-      ) : (
-        <p className="mt-1.5 text-[13px] text-[var(--muted)]">{subtitle}</p>
-      )}
 
-      <dl className="mt-6 grid grid-cols-3 gap-3 border-t border-[var(--border)] pt-5">
-        <div>
-          <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--muted)]">
+      <div className="mt-3 min-w-0">
+        {accounts.length === 0 ? (
+          <p className="text-[12px] text-[var(--muted)]">
+            Нет подключённых соцсетей
+          </p>
+        ) : (
+          <ul
+            className="flex flex-wrap items-center gap-2.5"
+            aria-label="Подключённые соцсети"
+          >
+            {accounts.map((acc) => {
+              const details = socialAccountShortLabel(acc);
+              return (
+                <li
+                  key={acc.id}
+                  className="flex min-w-0 max-w-full shrink-0 items-center gap-1.5"
+                  title={details}
+                >
+                  <SocialPlatformIcon
+                    platform={acc.platform}
+                    className="size-5"
+                  />
+                  <span className="min-w-0 truncate text-[12px] text-[var(--foreground)]">
+                    {clientPlatformName(acc.platform)}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+
+      <dl className="mt-5 grid grid-cols-3 gap-2 border-t border-[var(--border)] pt-5 sm:gap-3">
+        <div className="min-w-0">
+          <dt className="text-[10px] font-medium uppercase leading-tight tracking-[0.08em] text-[var(--muted)] sm:text-[11px]">
             Всего
           </dt>
-          <dd className="mt-1 text-[20px] font-semibold tabular-nums text-[var(--foreground)]">
+          <dd
+            className={`mt-1 text-[20px] font-semibold tabular-nums sm:text-[22px] ${POST_COUNT_NUM_CLASS.total}`}
+          >
             {client.postsTotal}
           </dd>
         </div>
-        <div>
-          <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--muted)]">
-            Месяц
+        <div className="min-w-0">
+          <dt className="text-[10px] font-medium uppercase leading-tight tracking-[0.08em] text-[var(--muted)] sm:text-[11px]">
+            Заплан.
           </dt>
-          <dd className="mt-1 text-[20px] font-semibold tabular-nums text-[var(--foreground)]">
-            {client.postsThisMonth}
+          <dd
+            className={`mt-1 text-[20px] font-semibold tabular-nums sm:text-[22px] ${POST_COUNT_NUM_CLASS.scheduled}`}
+            title="Запланировано"
+          >
+            {client.postsScheduled}
           </dd>
         </div>
-        <div>
-          <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--muted)]">
+        <div className="min-w-0">
+          <dt
+            className="text-[10px] font-medium uppercase leading-tight tracking-[0.08em] text-[var(--muted)] sm:text-[11px]"
+            title="На согласовании"
+          >
             Соглас.
           </dt>
           <dd
-            className={`mt-1 text-[20px] font-semibold tabular-nums ${
-              client.postsPendingReview > 0
-                ? "text-[var(--accent)]"
-                : "text-[var(--foreground)]"
-            }`}
+            className={`mt-1 text-[20px] font-semibold tabular-nums sm:text-[22px] ${POST_COUNT_NUM_CLASS.in_review}`}
+            title="На согласовании"
           >
             {client.postsPendingReview}
           </dd>
         </div>
       </dl>
 
-      <ul className="mt-5 flex flex-wrap gap-2" aria-label="Сферы деятельности">
+      <ul className="mt-5 flex min-h-0 flex-1 flex-wrap content-start gap-2" aria-label="Сферы деятельности">
         {client.activitySpheres.map((sphere) => (
           <li
             key={sphere}
-            className="rounded-md bg-[var(--surface-elevated)] px-2.5 py-1 text-[12px] text-[var(--muted)]"
+            className="rounded-md bg-[var(--surface-elevated)] px-2.5 py-1 text-[12px] text-[var(--muted)] h-fit"
           >
             {sphere}
           </li>
         ))}
       </ul>
+
+      <div className="mt-5">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            goToClient();
+          }}
+          className={btnOpenClass}
+        >
+          Открыть
+        </button>
+      </div>
     </article>
   );
 }

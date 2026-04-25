@@ -50,10 +50,19 @@ export type ClientRecord = {
   socialAccounts: ClientSocialAccountRecord[];
   postsTotal: number;
   postsThisMonth: number;
+  /** Посты со статусом `scheduled`. */
+  postsScheduled: number;
   postsPendingReview: number;
   activitySpheres: [string] | [string, string];
   contact?: string | null;
 };
+
+/** Краткое имя площадки для списков и иконок. */
+export function clientPlatformName(platform: ClientPlatform): string {
+  if (platform === "instagram") return "Instagram";
+  if (platform === "vk") return "ВКонтакте";
+  return "Telegram";
+}
 
 /** Метка аккаунта без имени клиента (селект «соцсеть»). */
 export function socialAccountShortLabel(account: ClientSocialAccountRecord): string {

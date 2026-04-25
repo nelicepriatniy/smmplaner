@@ -26,11 +26,7 @@ export function CalendarWithClientFilter({
       clients={clients}
       defaultYear={defaultYear}
       defaultMonthIndex={defaultMonthIndex}
-      filtersSlot={
-        <div className="flex min-h-0 w-full flex-1 flex-col rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)]/35 p-3 lg:p-3.5">
-          <CalendarPageFilters clientOptions={filterOptions} />
-        </div>
-      }
+      filtersSlot={<CalendarPageFilters clientOptions={filterOptions} />}
     />
   );
 }
