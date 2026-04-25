@@ -20,6 +20,7 @@ import {
   type PostDraftStatus,
 } from "@/domain/smm";
 import { POST_TYPE_OPTIONS } from "@/types/postType";
+import { headerAccentButtonClass } from "@/lib/headerAccentButtonClass";
 import { getSiteOriginFromHeaders } from "@/lib/media-display";
 import { getServerRefMs } from "@/lib/serverRefMs";
 import {
@@ -133,12 +134,21 @@ export default async function CurrentPostsPage({ searchParams }: PageProps) {
   return (
     <main className="w-full py-10 sm:py-12">
       <header className="mb-6 sm:mb-8">
-        <h1 className="text-[22px] font-semibold tracking-tight text-[var(--foreground)] sm:text-[24px]">
-          Актуальные посты
-        </h1>
-        <p className="mt-1.5 text-[14px] text-[var(--muted)]">
-          Черновики и запланированные публикации из базы данных.
-        </p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+          <div className="min-w-0">
+            <h1 className="text-[22px] font-semibold tracking-tight text-[var(--foreground)] sm:text-[24px]">
+              Актуальные посты
+            </h1>
+            <p className="mt-1 text-[14px] text-[var(--muted)]">
+              Черновики и запланированные публикации из базы данных.
+            </p>
+          </div>
+          <div className="flex w-full flex-shrink-0 flex-row flex-wrap items-center justify-end gap-2 sm:w-auto sm:gap-2.5">
+            <Link href="/posts/new" className={headerAccentButtonClass}>
+              Создать пост
+            </Link>
+          </div>
+        </div>
       </header>
 
       <Suspense
