@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DashboardActivityDeleteButton } from "@/components/dashboard/DashboardActivityDeleteButton";
 import { formatTimeAgoRuFrom } from "@/components/posts/postReviewUtils";
 import type { ActivityKind, RecentActivityRecord } from "@/domain/smm";
 
@@ -135,19 +136,22 @@ export function DashboardRecentActivity({
               </div>
             );
 
-            const cardBase = `rounded-xl border border-[var(--border)] py-3.5 pl-3.5 pr-3.5 sm:pl-4 sm:pr-4 ${meta.card}`;
+            const cardBase = `flex items-start gap-2 rounded-xl border border-[var(--border)] py-3.5 pl-3.5 pr-2 sm:gap-2.5 sm:pl-4 sm:pr-2 ${meta.card}`;
             const interactive =
-              "block transition-opacity hover:opacity-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]";
+              "min-w-0 flex-1 transition-opacity hover:opacity-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]";
 
             return (
               <li key={act.id}>
-                {href ? (
-                  <Link href={href} className={`${cardBase} ${interactive}`}>
-                    {body}
-                  </Link>
-                ) : (
-                  <div className={cardBase}>{body}</div>
-                )}
+                <div className={cardBase}>
+                  {href ? (
+                    <Link href={href} className={`block ${interactive}`}>
+                      {body}
+                    </Link>
+                  ) : (
+                    <div className={`min-w-0 flex-1 ${interactive}`}>{body}</div>
+                  )}
+                  <DashboardActivityDeleteButton activityId={act.id} />
+                </div>
               </li>
             );
           })}
