@@ -1,8 +1,13 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { NewPostEditor } from "@/components/posts/NewPostEditor";
 import { postDraftToEditorInitial } from "@/domain/smm";
+import {
+  getSiteOriginFromHeaders,
+  toAbsoluteMediaUrls,
+} from "@/lib/media-display";
 import { safeCalendarReturnTo } from "@/lib/safeReturnTo";
 import { getServerRefMs } from "@/lib/serverRefMs";
 import {
@@ -40,7 +45,13 @@ export default async function EditPostPage({ params, searchParams }: PageProps) 
   ]);
   if (!draft) notFound();
 
-  const initialValues = postDraftToEditorInitial(draft);
+  const baseInitial = postDraftToEditorInitial(draft);
+  const hdrs = await headers();
+  const mediaOrigin = getSiteOriginFromHeaders(hdrs);
+  const initialValues = {
+    ...baseInitial,
+    imageUrls: toAbsoluteMediaUrls(baseInitial.imageUrls, mediaOrigin || undefined),
+  };
 
   return (
     <main className="w-full py-8 sm:py-10">

@@ -4,6 +4,7 @@
  */
 export function getAppBaseUrl(): string | null {
   const fromEnv =
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
     process.env.APP_BASE_URL?.trim() ||
     process.env.AUTH_URL?.trim() ||
     (process.env.VERCEL_URL?.trim()

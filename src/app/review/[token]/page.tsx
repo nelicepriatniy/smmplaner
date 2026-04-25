@@ -3,8 +3,7 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { ClientReviewPanel } from "@/components/posts/ClientReviewPanel";
 import { toPostPublisherPreview } from "@/domain/smm";
-import { getAppBaseUrl } from "@/lib/app-base-url";
-import { toAbsoluteMediaUrls } from "@/lib/media-display";
+import { getSiteOriginFromHeaders, toAbsoluteMediaUrls } from "@/lib/media-display";
 import { getServerRefMs } from "@/lib/serverRefMs";
 import {
   getClientRecordById,
@@ -37,9 +36,7 @@ export default async function ClientReviewPage({ params }: PageProps) {
   const reviewToken = decodeURIComponent(token).trim();
 
   const hdrs = await headers();
-  const host = hdrs.get("x-forwarded-host") ?? hdrs.get("host") ?? "";
-  const proto = hdrs.get("x-forwarded-proto") ?? "https";
-  const requestOrigin = host ? `${proto}://${host}` : getAppBaseUrl() ?? "";
+  const requestOrigin = getSiteOriginFromHeaders(hdrs);
   const previewImageUrls = toAbsoluteMediaUrls(
     post.imageUrls,
     requestOrigin || undefined,

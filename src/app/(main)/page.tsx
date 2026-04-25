@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import { getSiteOriginFromHeaders } from "@/lib/media-display";
 import { DashboardHeaderActions } from "@/components/dashboard/DashboardHeaderActions";
 import { DashboardRecentActivity } from "@/components/dashboard/DashboardRecentActivity";
 import { DashboardStatsRow } from "@/components/dashboard/DashboardStatsRow";
@@ -8,7 +9,6 @@ import {
   getRecentActivities,
   getUpcomingScheduledPosts,
 } from "@/domain/smm";
-import { getAppBaseUrl } from "@/lib/app-base-url";
 import {
   listActivitiesForUser,
   listClientsForUser,
@@ -30,9 +30,7 @@ export default async function Home() {
   const recentActivity = getRecentActivities(activityRows, 8, refMs);
 
   const hdrs = await headers();
-  const host = hdrs.get("x-forwarded-host") ?? hdrs.get("host") ?? "";
-  const proto = hdrs.get("x-forwarded-proto") ?? "https";
-  const mediaOrigin = host ? `${proto}://${host}` : getAppBaseUrl() ?? "";
+  const mediaOrigin = getSiteOriginFromHeaders(hdrs);
 
   return (
     <main className="w-full py-10 sm:py-12">

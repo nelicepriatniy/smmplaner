@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { NewPostEditor } from "@/components/posts/NewPostEditor";
 import {
   getDefaultPublishSchedule,
@@ -8,6 +9,10 @@ import {
   postDraftToEditorInitial,
   type PostEditorInitialValues,
 } from "@/domain/smm";
+import {
+  getSiteOriginFromHeaders,
+  toAbsoluteMediaUrls,
+} from "@/lib/media-display";
 import { getServerRefMs } from "@/lib/serverRefMs";
 import {
   getPostForUser,
@@ -67,10 +72,22 @@ export default async function NewPostPage({ searchParams }: PageProps) {
     duplicateFrom: duplicateFromId,
   } = await searchParams;
 
-  const duplicateFrom: PostEditorInitialValues | null =
+  let duplicateFrom: PostEditorInitialValues | null =
     typeof duplicateFromId === "string"
       ? await toDuplicateFormValues(duplicateFromId, userId)
       : null;
+
+  if (duplicateFrom) {
+    const hdrs = await headers();
+    const mediaOrigin = getSiteOriginFromHeaders(hdrs);
+    duplicateFrom = {
+      ...duplicateFrom,
+      imageUrls: toAbsoluteMediaUrls(
+        duplicateFrom.imageUrls,
+        mediaOrigin || undefined,
+      ),
+    };
+  }
 
   const initialClientId =
     duplicateFrom != null ? undefined : validClientId(clients, clientParam);

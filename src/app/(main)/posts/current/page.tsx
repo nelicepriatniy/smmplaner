@@ -20,7 +20,7 @@ import {
   type PostDraftStatus,
 } from "@/domain/smm";
 import { POST_TYPE_OPTIONS } from "@/types/postType";
-import { getAppBaseUrl } from "@/lib/app-base-url";
+import { getSiteOriginFromHeaders } from "@/lib/media-display";
 import { getServerRefMs } from "@/lib/serverRefMs";
 import {
   listClientsForUser,
@@ -91,9 +91,7 @@ export default async function CurrentPostsPage({ searchParams }: PageProps) {
   ]);
 
   const hdrs = await headers();
-  const host = hdrs.get("x-forwarded-host") ?? hdrs.get("host") ?? "";
-  const proto = hdrs.get("x-forwarded-proto") ?? "https";
-  const siteOrigin = host ? `${proto}://${host}` : getAppBaseUrl() ?? "";
+  const siteOrigin = getSiteOriginFromHeaders(hdrs);
 
   const clientById = Object.fromEntries(clients.map((c) => [c.id, c]));
 
