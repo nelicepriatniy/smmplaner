@@ -1,3 +1,4 @@
+import { DashboardHeaderActions } from "@/components/dashboard/DashboardHeaderActions";
 import { DashboardRecentActivity } from "@/components/dashboard/DashboardRecentActivity";
 import { DashboardStatsRow } from "@/components/dashboard/DashboardStatsRow";
 import { DashboardUpcomingPosts } from "@/components/dashboard/DashboardUpcomingPosts";
@@ -29,12 +30,17 @@ export default async function Home() {
   return (
     <main className="w-full py-10 sm:py-12">
       <header className="mb-6 sm:mb-8">
-        <h1 className="text-[22px] font-semibold tracking-tight text-[var(--foreground)] sm:text-[24px]">
-          Дашборд
-        </h1>
-        <p className="mt-1 text-[14px] text-[var(--muted)]">
-          Сводка по клиентам и контенту
-        </p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+          <div className="min-w-0">
+            <h1 className="text-[22px] font-semibold tracking-tight text-[var(--foreground)] sm:text-[24px]">
+              Дашборд
+            </h1>
+            <p className="mt-1 text-[14px] text-[var(--muted)]">
+              Сводка по клиентам и контенту
+            </p>
+          </div>
+          <DashboardHeaderActions />
+        </div>
       </header>
       <DashboardStatsRow stats={stats} />
       <div className="mt-8 flex flex-col gap-8 sm:mt-10 lg:flex-row lg:items-stretch lg:gap-6 xl:gap-8">
