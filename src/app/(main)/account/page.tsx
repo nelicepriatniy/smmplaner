@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { SignOutButton } from "@/components/auth/SignOutButton";
+import { PersonalBotForm } from "@/components/account/PersonalBotForm";
+import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
   title: "Личный кабинет — smmplaner",
@@ -15,6 +17,15 @@ export default async function AccountPage() {
   }
 
   const { user } = session;
+  const userId = user.id;
+  if (!userId) {
+    redirect("/login");
+  }
+  const dbUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { personalTelegramBotToken: true },
+  });
+  const hasSavedPersonalBotToken = Boolean(dbUser?.personalTelegramBotToken?.trim());
   const email = user.email ?? "—";
   const displayName =
     user.name?.trim() ||
@@ -82,6 +93,21 @@ export default async function AccountPage() {
               <SignOutButton />
             </div>
           </div>
+        </div>
+      </section>
+
+      <section
+        className="mt-8 max-w-lg rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 sm:p-8"
+        aria-labelledby="account-personal-bot-heading"
+      >
+        <h2
+          id="account-personal-bot-heading"
+          className="text-[15px] font-semibold text-[var(--foreground)]"
+        >
+          Личный бот
+        </h2>
+        <div className="mt-4">
+          <PersonalBotForm hasSavedToken={hasSavedPersonalBotToken} />
         </div>
       </section>
     </main>

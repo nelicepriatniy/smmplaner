@@ -47,6 +47,8 @@ model User {
   id           String     @id @default(cuid())
   email        String     @unique
   passwordHash String     @map("password_hash")
+  /// Токен личного бота @BotFather для уведомлений клиентов (секрет; не путать с токенами в карточках соцсетей).
+  personalTelegramBotToken String? @map("personal_telegram_bot_token") @db.Text
   createdAt    DateTime   @default(now()) @map("created_at")
   updatedAt    DateTime   @updatedAt @map("updated_at")
   clients      Client[]

@@ -78,6 +78,18 @@ async function callTelegramJson(
   return parseTelegramResponse(res);
 }
 
+/** Уведомление в личный чат: токен из настроек пользователя, `chat_id` — из поля «Контакт» клиента. */
+export async function sendTelegramTextMessage(
+  botToken: string,
+  chatId: string,
+  text: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  return callTelegramJson(botToken, "sendMessage", {
+    chat_id: chatId,
+    text,
+  });
+}
+
 async function callTelegramFormData(
   botToken: string,
   method: string,

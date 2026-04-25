@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Script from "next/script";
 import { AuthSessionProvider } from "@/components/auth/SessionProvider";
 import { AppNotificationsProvider } from "@/components/notifications/AppNotifications";
 import "./globals.css";
@@ -13,6 +12,9 @@ export const metadata: Metadata = {
   },
 };
 
+// Ранний инлайн-скрипт: только так в root layout, без next/script + children.
+// `next/script` с телом {string} в React 19 даёт в консоли: «Encountered a script tag
+// while rendering React component» (скрипт не в обход дерева client components).
 const themeInitScript = `(function(){try{var t=localStorage.getItem("smmplaner-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t);}catch(e){}})();`;
 
 export default function RootLayout({
@@ -22,10 +24,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ru" data-theme="dark" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body className="antialiased">
-        <Script id="theme-init" strategy="beforeInteractive">
-          {themeInitScript}
-        </Script>
         <AuthSessionProvider>
           <AppNotificationsProvider>{children}</AppNotificationsProvider>
         </AuthSessionProvider>

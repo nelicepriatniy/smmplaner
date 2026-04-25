@@ -1,0 +1,30 @@
+---
+description: Do not use next/script with inline script children in App Router layout — use head + dangerouslySetInnerHTML instead (React 19).
+globs: "**/app/**/layout*.tsx"
+alwaysApply: false
+---
+
+# Тема / ранние inline-скрипты в `layout`
+
+В **root layout** (и аналогично) **не** используйте:
+
+```tsx
+import Script from "next/script";
+<Script id="…" strategy="beforeInteractive">
+  {`(function(){ ... })();`}
+</Script>
+```
+
+В **React 19** это приводит к предупреждению в консоли: *Encountered a script tag while rendering React component* — вложенный `script` в дереве React на клиенте не выполняется так, как ожидается.
+
+**Правильно** для blocking theme / localStorage до гидрации: обычный тег в **серверном** layout, в `<head>`:
+
+```tsx
+<head>
+  <script dangerouslySetInnerHTML={{ __html: inlineIifeString }} />
+</head>
+```
+
+См. существующий паттерн в `src/app/layout.tsx` (тема `smmplaner-theme`).
+
+`next/script` оставьте для **внешних** `src` или сценариев, где это задокументировано в актуальном `next` для вашей версии.

@@ -14,6 +14,7 @@ import {
   createDraftPostAction,
   createScheduledPostAction,
   deletePostAction,
+  notifyClientAboutPostAction,
   publishPostNowAction,
   setPostDraftOrScheduledAction,
   updatePostAction,
@@ -164,6 +165,7 @@ export function NewPostEditor({
   const [isSaving, startSaveTransition] = useTransition();
   const [isDeleting, startDeleteTransition] = useTransition();
   const [isPublishing, startPublishTransition] = useTransition();
+  const [isNotifying, startNotifyTransition] = useTransition();
   const [saveError, setSaveError] = useState("");
   const isEditMode = initialValues != null && Boolean(existingPostId);
   const seed = seedForNew(initialValues, duplicateFrom);
@@ -547,6 +549,22 @@ export function NewPostEditor({
     toast,
   ]);
 
+  const notifyClient = useCallback(() => {
+    if (!existingPostId) return;
+    setSaveError("");
+    startNotifyTransition(async () => {
+      const res = await notifyClientAboutPostAction(existingPostId);
+      if (!res.ok) {
+        setSaveError(res.error);
+        return;
+      }
+      toast({
+        message: "Сообщение с ссылкой отправлено клиенту в Telegram",
+        variant: "success",
+      });
+    });
+  }, [existingPostId, toast]);
+
   const canPublishNowInstant =
     isEditMode &&
     !ro &&
@@ -625,6 +643,13 @@ export function NewPostEditor({
   ]);
 
   const publishBusy = isSaving || isDeleting || isPublishing;
+
+  const canNotifyClient =
+    isEditMode &&
+    Boolean(clientId) &&
+    Boolean(selectedAccount) &&
+    !publishBusy &&
+    !isNotifying;
 
   const tabInactive =
     "border-[var(--border)] bg-[var(--background)] text-[var(--muted)] hover:border-[color-mix(in_srgb,var(--foreground)_12%,var(--border))] hover:text-[var(--foreground)]";
@@ -1056,6 +1081,14 @@ export function NewPostEditor({
               ) : null}
               <button
                 type="button"
+                onClick={notifyClient}
+                disabled={!canNotifyClient}
+                className="rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] px-5 py-2.5 text-[14px] font-semibold text-[var(--foreground)] transition-colors hover:bg-[var(--border)] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isNotifying ? "Отправка…" : "Уведомить клиента"}
+              </button>
+              <button
+                type="button"
                 onClick={removePost}
                 disabled={publishBusy}
                 className="rounded-xl border border-rose-500/45 bg-transparent px-5 py-2.5 text-[14px] font-semibold text-rose-200 transition-colors hover:bg-rose-950/35 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1064,14 +1097,24 @@ export function NewPostEditor({
               </button>
             </>
           ) : isEditMode && publishedReadOnly ? (
-            <button
-              type="button"
-              onClick={removePost}
-              disabled={isDeleting}
-              className="rounded-xl border border-rose-500/45 bg-transparent px-5 py-2.5 text-[14px] font-semibold text-rose-200 transition-colors hover:bg-rose-950/35 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isDeleting ? "Удаление…" : "Удалить"}
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={notifyClient}
+                disabled={!canNotifyClient}
+                className="rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] px-5 py-2.5 text-[14px] font-semibold text-[var(--foreground)] transition-colors hover:bg-[var(--border)] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isNotifying ? "Отправка…" : "Уведомить клиента"}
+              </button>
+              <button
+                type="button"
+                onClick={removePost}
+                disabled={isDeleting}
+                className="rounded-xl border border-rose-500/45 bg-transparent px-5 py-2.5 text-[14px] font-semibold text-rose-200 transition-colors hover:bg-rose-950/35 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isDeleting ? "Удаление…" : "Удалить"}
+              </button>
+            </>
           ) : !isEditMode ? (
             <>
               <button

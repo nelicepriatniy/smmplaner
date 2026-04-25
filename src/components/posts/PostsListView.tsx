@@ -2,6 +2,7 @@ import { toAbsoluteMediaSrc } from "@/lib/media-display";
 import Link from "next/link";
 import { PostClientReviewLink } from "@/components/posts/PostClientReviewLink";
 import { PostListDeleteButton } from "@/components/posts/PostListDeleteButton";
+import { PostListNotifyClientButton } from "@/components/posts/PostListNotifyClientButton";
 import { formatTimeAgoRuFrom } from "@/components/posts/postReviewUtils";
 import { publishScheduleInstantMs } from "@/domain/smm";
 import {
@@ -55,6 +56,7 @@ export function PostsListView({
   hasActiveFilters,
   emptyFilteredMessage,
   emptyNoFiltersMessage,
+  showNotifyClientButton = false,
 }: {
   rows: PostDraftRecord[];
   clients: ClientRecord[];
@@ -63,6 +65,8 @@ export function PostsListView({
   hasActiveFilters: boolean;
   emptyFilteredMessage: string;
   emptyNoFiltersMessage: string;
+  /** «Уведомить клиента» (Telegram) — для списка актуальных постов. */
+  showNotifyClientButton?: boolean;
 }) {
   const clientById = Object.fromEntries(clients.map((c) => [c.id, c]));
 
@@ -197,6 +201,17 @@ export function PostsListView({
                     >
                       Обсуждения
                     </Link>
+                    {showNotifyClientButton ? (
+                      <>
+                        <span
+                          className="text-[13px] text-[var(--muted)]"
+                          aria-hidden
+                        >
+                          ·
+                        </span>
+                        <PostListNotifyClientButton postId={post.id} />
+                      </>
+                    ) : null}
                     <span
                       className="text-[13px] text-[var(--muted)]"
                       aria-hidden

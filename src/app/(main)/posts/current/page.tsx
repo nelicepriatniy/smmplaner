@@ -131,6 +131,7 @@ export default async function CurrentPostsPage({ searchParams }: PageProps) {
         hasActiveFilters={hasActiveFilters}
         emptyFilteredMessage="Нет постов, подходящих под выбранные фильтры."
         emptyNoFiltersMessage="Постов пока нет. Создайте пост в разделе «Новый пост» или импортируйте демо через сид."
+        showNotifyClientButton
       />
     </main>
   );

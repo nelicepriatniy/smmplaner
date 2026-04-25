@@ -1,10 +1,12 @@
 "use server";
 
+import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import type { PostContentType, PostDraftStatus } from "@prisma/client";
 import { auth } from "@/auth";
-import { getAppBaseUrl } from "@/lib/app-base-url";
+import { getAppBaseUrl, getAppBaseUrlOrFromRequestHeaders } from "@/lib/app-base-url";
+import { parseClientContactToTelegramChatId } from "@/lib/telegram-client-contact";
 import { newClientReviewToken } from "@/lib/clientReviewToken";
 import { deletePostUploadedImageFiles } from "@/lib/post-upload-files";
 import { prisma } from "@/lib/prisma";
@@ -13,7 +15,7 @@ import {
   normalizeAccountTelegramChats,
   resolveTelegramChatIdsForTargets,
 } from "@/lib/telegram-targets";
-import { sendPostToTelegramChat } from "@/lib/telegram-send";
+import { sendPostToTelegramChat, sendTelegramTextMessage } from "@/lib/telegram-send";
 import { sendPostToVkWall } from "@/lib/vk-wall-send";
 import type { PostType } from "@/types/postType";
 
@@ -515,4 +517,57 @@ export async function addPostDiscussionCommentAction(
     console.error(e);
     return { ok: false, error: "Не удалось отправить сообщение." };
   }
+}
+
+/**
+ * Уведомление в Telegram: личный бот из ЛК, получатель — из поля «Контакт» клиента,
+ * текст + ссылка публичного согласования.
+ */
+export async function notifyClientAboutPostAction(
+  postId: string
+): Promise<PostActionResult> {
+  const userId = await requireUserId();
+  if (!userId) return { ok: false, error: "Нужна авторизация." };
+
+  const [user, post] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { personalTelegramBotToken: true },
+    }),
+    prisma.post.findFirst({
+      where: { id: postId, userId },
+      include: { socialAccount: { include: { client: true } } },
+    }),
+  ]);
+
+  if (!post) return { ok: false, error: "Пост не найден." };
+
+  const botToken = user?.personalTelegramBotToken?.trim() ?? "";
+  if (!botToken) {
+    return {
+      ok: false,
+      error: "Сохраните токен личного бота в разделе «Личный кабинет».",
+    };
+  }
+
+  const base = getAppBaseUrlOrFromRequestHeaders(await headers());
+  if (!base) {
+    return {
+      ok: false,
+      error:
+        "Не удалось определить адрес сайта для ссылки. Укажите в .env NEXT_PUBLIC_APP_URL или APP_BASE_URL (или откройте приложение в браузере, чтобы в запросе был заголовок Host).",
+    };
+  }
+
+  const path = `/review/${encodeURIComponent(post.clientReviewToken)}`;
+  const link = `${base}${path}`;
+  const text = `Посмотрите пост.\n\n${link}`;
+
+  const chat = parseClientContactToTelegramChatId(post.socialAccount.client.contact);
+  if (!chat.ok) return { ok: false, error: chat.error };
+
+  const send = await sendTelegramTextMessage(botToken, chat.chatId, text);
+  if (!send.ok) return { ok: false, error: send.error };
+
+  return { ok: true, postId };
 }
