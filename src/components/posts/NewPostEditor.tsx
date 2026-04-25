@@ -504,76 +504,73 @@ export function NewPostEditor({
               </p>
 
               <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
-                {/* Клиент + соцсети всегда в одну строку (табы соцсетей — flex-nowrap + scroll). */}
-                <div className="flex min-w-0 max-w-full flex-[0_1_auto] flex-nowrap items-end gap-3 sm:gap-4">
-                  <div className="w-[min(100%,14rem)] shrink-0">
-                    <label
-                      htmlFor="post-client"
-                      className="text-[14px] font-medium text-[var(--foreground)]"
-                    >
-                      Клиент
-                    </label>
-                    <select
-                      id="post-client"
-                      className="mt-1.5 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-[14px] text-[var(--foreground)] outline-offset-2 focus:border-[color-mix(in_srgb,var(--accent)_50%,var(--border))] focus:ring-2 focus:ring-[var(--accent-soft)]"
-                      value={clientId}
-                      disabled={ro || pool.length === 0 || isEditMode}
-                      onChange={(e) => {
-                        const id = e.target.value;
-                        setClientId(id);
-                        const c = clients.find((x) => x.id === id);
-                        setSocialAccountId(c?.socialAccounts[0]?.id ?? "");
-                      }}
-                    >
-                      {pool.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.fullName}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                <div className="w-[min(100%,14rem)] shrink-0">
+                  <label
+                    htmlFor="post-client"
+                    className="text-[14px] font-medium text-[var(--foreground)]"
+                  >
+                    Клиент
+                  </label>
+                  <select
+                    id="post-client"
+                    className="mt-1.5 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-[14px] text-[var(--foreground)] outline-offset-2 focus:border-[color-mix(in_srgb,var(--accent)_50%,var(--border))] focus:ring-2 focus:ring-[var(--accent-soft)]"
+                    value={clientId}
+                    disabled={ro || pool.length === 0 || isEditMode}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      setClientId(id);
+                      const c = clients.find((x) => x.id === id);
+                      setSocialAccountId(c?.socialAccounts[0]?.id ?? "");
+                    }}
+                  >
+                    {pool.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.fullName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-                  <div className="min-w-0 max-w-[min(100%,calc(100vw-2.5rem))] sm:max-w-none">
-                    <span
-                      id="post-social-tabs-label"
-                      className="text-[14px] font-medium text-[var(--foreground)]"
-                    >
-                      Соцсеть
-                    </span>
-                    <div
-                      role="tablist"
-                      aria-labelledby="post-social-tabs-label"
-                      className="mt-1.5 flex max-w-full flex-nowrap gap-2 overflow-x-auto pb-0.5 [-webkit-overflow-scrolling:touch] [scrollbar-width:thin]"
-                    >
-                      {socialOptions.map((s) => {
-                        const selected = s.id === socialAccountId;
-                        return (
-                          <button
-                            key={s.id}
-                            type="button"
-                            role="tab"
-                            aria-selected={selected}
-                            disabled={ro || !socialOptions.length || isEditMode}
-                            onClick={() => setSocialAccountId(s.id)}
-                            className={`inline-flex shrink-0 items-center gap-2 rounded-xl border px-2.5 py-2 text-left text-[13px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${tabFocus} ${
-                              selected ? tabActive : tabInactive
-                            }`}
-                          >
-                            <SocialPlatformIcon
-                              platform={s.platform}
-                              className="size-4 shrink-0"
-                            />
-                            <span className="max-w-[11rem] truncate sm:max-w-[14rem]">
-                              {clientPlatformName(s.platform)}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
+                {/* Как тип публикации: при нехватке места уходит на следующую строку; табы — в одну линию + scroll. */}
+                <div className="min-w-0 max-w-full flex-[1_1_17.5rem]">
+                  <span
+                    id="post-social-tabs-label"
+                    className="text-[14px] font-medium text-[var(--foreground)]"
+                  >
+                    Соцсеть
+                  </span>
+                  <div
+                    role="tablist"
+                    aria-labelledby="post-social-tabs-label"
+                    className="mt-1.5 flex max-w-full flex-nowrap gap-2 overflow-x-auto pb-0.5 [-webkit-overflow-scrolling:touch] [scrollbar-width:thin]"
+                  >
+                    {socialOptions.map((s) => {
+                      const selected = s.id === socialAccountId;
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          role="tab"
+                          aria-selected={selected}
+                          disabled={ro || !socialOptions.length || isEditMode}
+                          onClick={() => setSocialAccountId(s.id)}
+                          className={`inline-flex shrink-0 items-center gap-2 rounded-xl border px-2.5 py-2 text-left text-[13px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${tabFocus} ${
+                            selected ? tabActive : tabInactive
+                          }`}
+                        >
+                          <SocialPlatformIcon
+                            platform={s.platform}
+                            className="size-4 shrink-0"
+                          />
+                          <span className="max-w-[11rem] truncate sm:max-w-[14rem]">
+                            {clientPlatformName(s.platform)}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
-                {/* При нехватке места на строке уходит вниз (flex-basis + wrap). */}
                 {graphFeedEditor ? (
                   <div className="min-w-0 flex-[1_1_17.5rem]">
                     <span className="text-[14px] font-medium text-[var(--foreground)]">

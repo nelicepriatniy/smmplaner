@@ -2,6 +2,8 @@ import Link from "next/link";
 import { formatTimeAgoRuFrom } from "@/components/posts/postReviewUtils";
 import type { ActivityKind, RecentActivityRecord } from "@/domain/smm";
 
+const BADGE_TEXT_LIGHT = "text-[#141414]";
+
 const KIND_META: Record<
   ActivityKind,
   {
@@ -16,43 +18,37 @@ const KIND_META: Record<
     label: "Комментарий",
     card: "border-l-[3px] border-[color-mix(in_srgb,#fbbf24_72%,var(--border))] bg-[color-mix(in_srgb,#fbbf24_9%,var(--surface))]",
     dot: "bg-[color-mix(in_srgb,#fbbf24_92%,#78716c)]",
-    badge:
-      "bg-[color-mix(in_srgb,#fbbf24_16%,transparent)] text-[color-mix(in_srgb,#fde68a_95%,#a16207)]",
+    badge: `bg-[color-mix(in_srgb,#fbbf24_16%,transparent)] ${BADGE_TEXT_LIGHT} dark:text-[color-mix(in_srgb,#fde68a_95%,#a16207)]`,
   },
   client_approval: {
     label: "Одобрено",
     card: "border-l-[3px] border-[color-mix(in_srgb,#34d399_78%,var(--border))] bg-[color-mix(in_srgb,#34d399_10%,var(--surface))]",
     dot: "bg-[color-mix(in_srgb,#6ee7b7_90%,#059669)]",
-    badge:
-      "bg-[color-mix(in_srgb,#34d399_18%,transparent)] text-[color-mix(in_srgb,#a7f3d0_95%,#047857)]",
+    badge: `bg-[color-mix(in_srgb,#34d399_18%,transparent)] ${BADGE_TEXT_LIGHT} dark:text-[color-mix(in_srgb,#a7f3d0_95%,#047857)]`,
   },
   client_rejection: {
     label: "Отклонено",
     card: "border-l-[3px] border-[color-mix(in_srgb,#fb7185_75%,var(--border))] bg-[color-mix(in_srgb,#fb7185_8%,var(--surface))]",
     dot: "bg-[color-mix(in_srgb,#fb7185_88%,#be123c)]",
-    badge:
-      "bg-[color-mix(in_srgb,#fb7185_14%,transparent)] text-[color-mix(in_srgb,#fecdd3_92%,#9f1239)]",
+    badge: `bg-[color-mix(in_srgb,#fb7185_14%,transparent)] ${BADGE_TEXT_LIGHT} dark:text-[color-mix(in_srgb,#fecdd3_92%,#9f1239)]`,
   },
   post_published: {
     label: "В эфире",
     card: "border-l-[3px] border-[color-mix(in_srgb,#38bdf8_72%,var(--border))] bg-[color-mix(in_srgb,#38bdf8_9%,var(--surface))]",
     dot: "bg-[color-mix(in_srgb,#7dd3fc_85%,#0369a1)]",
-    badge:
-      "bg-[color-mix(in_srgb,#38bdf8_16%,transparent)] text-[color-mix(in_srgb,#bae6fd_95%,#0369a1)]",
+    badge: `bg-[color-mix(in_srgb,#38bdf8_16%,transparent)] ${BADGE_TEXT_LIGHT} dark:text-[color-mix(in_srgb,#bae6fd_95%,#0369a1)]`,
   },
   client_added: {
     label: "Клиент",
     card: "border-l-[3px] border-[color-mix(in_srgb,#a78bfa_74%,var(--border))] bg-[color-mix(in_srgb,#a78bfa_10%,var(--surface))]",
     dot: "bg-[color-mix(in_srgb,#c4b5fd_88%,#6d28d9)]",
-    badge:
-      "bg-[color-mix(in_srgb,#a78bfa_16%,transparent)] text-[color-mix(in_srgb,#ddd6fe_92%,#5b21b6)]",
+    badge: `bg-[color-mix(in_srgb,#a78bfa_16%,transparent)] ${BADGE_TEXT_LIGHT} dark:text-[color-mix(in_srgb,#ddd6fe_92%,#5b21b6)]`,
   },
   post_scheduled: {
     label: "Расписание",
     card: "border-l-[3px] border-[color-mix(in_srgb,#94a3b8_68%,var(--border))] bg-[color-mix(in_srgb,#94a3b8_8%,var(--surface))]",
     dot: "bg-[color-mix(in_srgb,#cbd5e1_78%,#64748b)]",
-    badge:
-      "bg-[color-mix(in_srgb,#94a3b8_14%,transparent)] text-[color-mix(in_srgb,#e2e8f0_88%,#475569)]",
+    badge: `bg-[color-mix(in_srgb,#94a3b8_14%,transparent)] ${BADGE_TEXT_LIGHT} dark:text-[color-mix(in_srgb,#e2e8f0_88%,#475569)]`,
   },
 };
 

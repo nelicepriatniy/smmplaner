@@ -189,8 +189,8 @@ export default async function CurrentPostsPage({ searchParams }: PageProps) {
 
             return (
               <li key={post.id}>
-                <article className="flex gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:gap-5 sm:p-5">
-                      <div className="relative size-[72px] shrink-0 overflow-hidden rounded-xl bg-[var(--surface-elevated)] sm:size-[88px]">
+                <article className="flex flex-col gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:flex-row sm:gap-5 sm:p-5">
+                      <div className="relative size-[72px] shrink-0 self-start overflow-hidden rounded-xl bg-[var(--surface-elevated)] sm:size-[88px] sm:self-auto">
                         {thumb ? (
                           <Image
                             src={thumb}
@@ -202,7 +202,7 @@ export default async function CurrentPostsPage({ searchParams }: PageProps) {
                           />
                         ) : null}
                       </div>
-                      <div className="min-w-0 flex-1">
+                      <div className="min-w-0 w-full flex-1">
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
                           <span
                             className={statusBadgeClass(post.status)}
@@ -244,9 +244,9 @@ export default async function CurrentPostsPage({ searchParams }: PageProps) {
                             ? "…"
                             : ""}
                         </p>
-                        <div className="mt-4 flex flex-row flex-wrap items-stretch gap-3">
+                        <div className="mt-4 flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap">
                           {lastDiscussion ? (
-                            <div className="min-w-0 flex-1 basis-0 rounded-xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface-elevated)_85%,transparent)] px-3.5 py-3">
+                            <div className="w-full min-w-0 rounded-xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface-elevated)_85%,transparent)] px-3.5 py-3 sm:flex-1 sm:basis-0">
                               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
                                 Комментарии
                               </p>
@@ -276,8 +276,8 @@ export default async function CurrentPostsPage({ searchParams }: PageProps) {
                             openPath={reviewPath}
                             className={
                               lastDiscussion
-                                ? "min-w-0 flex-1 basis-0"
-                                : "min-w-0 w-full"
+                                ? "w-full min-w-0 sm:flex-1 sm:basis-0"
+                                : "w-full min-w-0"
                             }
                           />
                         </div>

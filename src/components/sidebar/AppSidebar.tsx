@@ -3,17 +3,18 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, type ReactNode } from "react";
 import { LogoMark } from "@/components/header/LogoMark";
 import {
   IconCalendar,
   IconChevronLeft,
   IconChevronRight,
+  IconClose,
   IconDashboard,
   IconNewPost,
   IconPosts,
   IconUsers,
 } from "@/components/icons/NavIcons";
-import type { ReactNode } from "react";
 import {
   SIDEBAR_COLLAPSED_PX,
   SIDEBAR_EXPANDED_PX,
@@ -51,12 +52,14 @@ function NavItem({
   active,
   icon,
   collapsed,
+  onNavigate,
   children,
 }: {
   href: string;
   active: boolean;
   collapsed: boolean;
   icon?: ReactNode;
+  onNavigate?: () => void;
   children: React.ReactNode;
 }) {
   const labelText = typeof children === "string" ? children : undefined;
@@ -64,6 +67,7 @@ function NavItem({
     <Link
       href={href}
       title={collapsed && labelText ? labelText : undefined}
+      onClick={onNavigate}
       className={`flex items-center rounded-lg text-[14px] font-medium outline-offset-2 transition-[padding,gap] duration-300 ease-out focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
         collapsed ? "justify-center gap-0 px-2 py-2.5" : "gap-2.5 px-3 py-2"
       } ${
@@ -110,12 +114,33 @@ export function AppSidebar({
   user,
   collapsed,
   onToggleCollapsed,
+  isNarrow,
+  mobileOpen,
+  onMobileOpenChange,
+  drawerTransitionMs = 360,
+  drawerTransitionEasing = "cubic-bezier(0.22, 1, 0.36, 1)",
+  prefersReducedMotion = false,
 }: {
   user: AppSidebarUser;
   collapsed: boolean;
   onToggleCollapsed: () => void;
+  isNarrow: boolean;
+  mobileOpen: boolean;
+  onMobileOpenChange: (open: boolean) => void;
+  /** Длительность и кривая для выезда drawer на телефоне и для ширины панели на десктопе. */
+  drawerTransitionMs?: number;
+  drawerTransitionEasing?: string;
+  prefersReducedMotion?: boolean;
 }) {
   const pathname = usePathname();
+
+  useEffect(() => {
+    if (isNarrow) onMobileOpenChange(false);
+  }, [pathname, isNarrow, onMobileOpenChange]);
+
+  const closeMobile = () => {
+    if (isNarrow) onMobileOpenChange(false);
+  };
   const displayName =
     user.name?.trim() ||
     (user.email ? user.email.split("@")[0] : null) ||
@@ -125,42 +150,101 @@ export function AppSidebar({
   const initial = displayName.trim().charAt(0).toUpperCase() || "?";
   const accountActive = pathname === "/account";
 
-  const sidebarW = collapsed ? SIDEBAR_COLLAPSED_PX : SIDEBAR_EXPANDED_PX;
+  const navCollapsed = !isNarrow && collapsed;
+  const sidebarW = navCollapsed ? SIDEBAR_COLLAPSED_PX : SIDEBAR_EXPANDED_PX;
+  const drawerHidden = isNarrow && !mobileOpen;
+
+  const fastMs = Math.min(90, drawerTransitionMs);
+  /** На телефоне `transform` задаём только inline — так браузер стабильно интерполирует выезд. */
+  const asideTransition = prefersReducedMotion
+    ? isNarrow
+      ? `transform ${fastMs}ms linear, box-shadow ${fastMs}ms linear`
+      : `width ${fastMs}ms linear, padding ${fastMs}ms linear, box-shadow ${fastMs}ms linear`
+    : isNarrow
+      ? `transform ${drawerTransitionMs}ms ${drawerTransitionEasing}, box-shadow ${drawerTransitionMs}ms ${drawerTransitionEasing}`
+      : `width ${drawerTransitionMs}ms ${drawerTransitionEasing}, padding ${drawerTransitionMs}ms ${drawerTransitionEasing}, box-shadow ${drawerTransitionMs}ms ${drawerTransitionEasing}`;
+
+  const drawerTransform = isNarrow
+    ? mobileOpen
+      ? "translate3d(0,0,0)"
+      : "translate3d(-100%,0,0)"
+    : undefined;
+
+  const drawerShadow = isNarrow
+    ? mobileOpen
+      ? "4px 0 24px rgba(0,0,0,0.14)"
+      : "none"
+    : undefined;
 
   return (
     <aside
-      style={{ width: sidebarW }}
-      className={`fixed left-0 top-0 z-40 flex h-dvh shrink-0 flex-col overflow-x-hidden overflow-y-auto border-r border-[var(--border)] bg-[var(--surface)] pt-6 pb-5 transition-[width,padding] duration-300 ease-out ${
-        collapsed ? "px-2" : "px-4"
+      id="app-sidebar"
+      style={{
+        width: isNarrow ? SIDEBAR_EXPANDED_PX : sidebarW,
+        transition: asideTransition,
+        ...(isNarrow
+          ? {
+              transform: drawerTransform,
+              boxShadow: drawerShadow,
+            }
+          : {}),
+      }}
+      aria-hidden={drawerHidden}
+      className={`fixed left-0 top-0 flex h-dvh shrink-0 flex-col overflow-x-hidden overflow-y-auto border-r border-[var(--border)] bg-[var(--surface)] pt-6 pb-5 [backface-visibility:hidden] ${
+        isNarrow && !prefersReducedMotion ? "will-change-[transform]" : ""
+      } ${navCollapsed ? "px-2" : "px-4"} ${
+        isNarrow
+          ? mobileOpen
+            ? "z-50"
+            : "z-40 pointer-events-none"
+          : "z-40"
       }`}
     >
-      <Link
-        href="/"
-        title={collapsed ? "smmplaner — на главную" : undefined}
-        className={`group flex items-center outline-offset-4 transition-opacity hover:opacity-90 focus-visible:opacity-90 ${
-          collapsed ? "justify-center px-0" : "gap-3 px-2"
+      <div
+        className={`flex items-center gap-2 ${
+          navCollapsed ? "justify-center" : ""
         }`}
       >
-        <LogoMark />
-        <span
-          className={
-            collapsed
-              ? "sr-only"
-              : "text-[15px] font-semibold tracking-wide text-[var(--foreground)]"
-          }
+        <Link
+          href="/"
+          title={navCollapsed ? "smmplaner — на главную" : undefined}
+          onClick={closeMobile}
+          className={`group flex min-w-0 flex-1 items-center outline-offset-4 transition-opacity hover:opacity-90 focus-visible:opacity-90 ${
+            navCollapsed ? "justify-center px-0" : "gap-3 px-2"
+          }`}
         >
-          smmplaner
-        </span>
-      </Link>
+          <LogoMark />
+          <span
+            className={
+              navCollapsed
+                ? "sr-only"
+                : "text-[15px] font-semibold tracking-wide text-[var(--foreground)]"
+            }
+          >
+            smmplaner
+          </span>
+        </Link>
+        {isNarrow ? (
+          <button
+            type="button"
+            onClick={closeMobile}
+            aria-label="Закрыть меню"
+            className="shrink-0 rounded-lg p-2 text-[var(--muted)] transition-colors hover:bg-[var(--surface-elevated)] hover:text-[var(--foreground)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+          >
+            <IconClose className="size-5" aria-hidden />
+          </button>
+        ) : null}
+      </div>
 
-      <Divider collapsed={collapsed} />
+      <Divider collapsed={navCollapsed} />
 
       <nav className="flex flex-col gap-0.5" aria-label="Основное меню">
         {mainNav.map((item) => (
           <NavItem
             key={item.href}
             href={item.href}
-            collapsed={collapsed}
+            collapsed={navCollapsed}
+            onNavigate={closeMobile}
             active={isNavActive(pathname, item.href)}
             icon={<item.Icon className="size-5" />}
           >
@@ -169,11 +253,11 @@ export function AppSidebar({
         ))}
       </nav>
 
-      <Divider collapsed={collapsed} />
+      <Divider collapsed={navCollapsed} />
 
       <p
         className={
-          collapsed
+          navCollapsed
             ? "sr-only"
             : "mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]"
         }
@@ -185,7 +269,8 @@ export function AppSidebar({
           <NavItem
             key={item.href}
             href={item.href}
-            collapsed={collapsed}
+            collapsed={navCollapsed}
+            onNavigate={closeMobile}
             active={isNavActive(pathname, item.href)}
             icon={<item.Icon className="size-5" />}
           >
@@ -195,36 +280,39 @@ export function AppSidebar({
       </nav>
 
       <div className="mt-auto border-t border-[var(--border)] pt-4">
-        <button
-          type="button"
-          onClick={onToggleCollapsed}
-          aria-expanded={!collapsed}
-          aria-label={
-            collapsed ? "Развернуть боковую панель" : "Свернуть боковую панель"
-          }
-          className={`mb-3 flex w-full items-center rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] py-2 text-[var(--muted)] transition-[padding,gap,colors] duration-300 ease-out hover:bg-[var(--border)] hover:text-[var(--foreground)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
-            collapsed ? "justify-center px-0" : "justify-center gap-2 px-3"
-          }`}
-        >
-          {collapsed ? (
-            <IconChevronRight className="size-5 shrink-0" aria-hidden />
-          ) : (
-            <>
-              <IconChevronLeft className="size-4 shrink-0" aria-hidden />
-              <span className="text-[12px] font-medium" aria-hidden>
-                Свернуть
-              </span>
-            </>
-          )}
-        </button>
+        {isNarrow ? null : (
+          <button
+            type="button"
+            onClick={onToggleCollapsed}
+            aria-expanded={!collapsed}
+            aria-label={
+              collapsed ? "Развернуть боковую панель" : "Свернуть боковую панель"
+            }
+            className={`mb-3 flex w-full items-center rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] py-2 text-[var(--muted)] transition-[padding,gap,colors] duration-300 ease-out hover:bg-[var(--border)] hover:text-[var(--foreground)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
+              collapsed ? "justify-center px-0" : "justify-center gap-2 px-3"
+            }`}
+          >
+            {collapsed ? (
+              <IconChevronRight className="size-5 shrink-0" aria-hidden />
+            ) : (
+              <>
+                <IconChevronLeft className="size-4 shrink-0" aria-hidden />
+                <span className="text-[12px] font-medium" aria-hidden>
+                  Свернуть
+                </span>
+              </>
+            )}
+          </button>
+        )}
 
-        <ThemeToggle compact={collapsed} />
+        <ThemeToggle compact={navCollapsed} />
 
         <Link
           href="/account"
-          title={collapsed ? `${displayName} · ${subtitle}` : undefined}
+          title={navCollapsed ? `${displayName} · ${subtitle}` : undefined}
+          onClick={closeMobile}
           className={`flex items-center rounded-xl py-2 outline-offset-2 transition-[padding,gap] duration-300 ease-out focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
-            collapsed ? "justify-center px-0" : "gap-3 px-2"
+            navCollapsed ? "justify-center px-0" : "gap-3 px-2"
           } ${
             accountActive
               ? "bg-[var(--accent-soft)]"
@@ -251,7 +339,7 @@ export function AppSidebar({
           )}
           <div
             className={
-              collapsed
+              navCollapsed
                 ? "sr-only"
                 : "min-w-0 flex-1 overflow-hidden text-ellipsis"
             }

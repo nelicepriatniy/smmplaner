@@ -131,3 +131,24 @@ export function IconNewPost({ className = "size-5" }: { className?: string }) {
     </svg>
   );
 }
+
+export function IconMenu({ className = "size-5" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path className={stroke} d="M5 7h14M5 12h14M5 17h14" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function IconClose({ className = "size-5" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        className={stroke}
+        d="m6 6 12 12M18 6 6 18"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
