@@ -257,6 +257,17 @@ function ClientAddFormBody({ onDismiss, onSaved }: ClientAddFormBodyProps) {
         ): access token, владелец стены (owner_id) и публикация от имени сообщества при
         необходимости. Токен хранится в базе — доверенный сервер и ограничение прав токена.
       </>
+    ) : values.platform === "facebook" ? (
+      <>
+        Публикация на <strong>Facebook Page</strong> через Graph API: числовой ID страницы,
+        долгоживущий <strong>Page access token</strong> (scope вроде{" "}
+        <code className="rounded bg-[var(--surface-elevated)] px-1">pages_manage_posts</code>,{" "}
+        <code className="rounded bg-[var(--surface-elevated)] px-1">pages_read_engagement</code>) и
+        короткое имя из ссылки{" "}
+        <code className="rounded bg-[var(--surface-elevated)] px-1">facebook.com/…</code>. Страницу
+        привяжите к <strong>Meta Business Suite</strong> / Business Manager и согласуйте доступы
+        приложения с клиентом. Токен хранится в БД — доверенный сервер и HTTPS.
+      </>
     ) : (
       <>
         Укажите контакты и при необходимости данные для публикации через Instagram Graph API
@@ -304,7 +315,7 @@ function ClientAddFormBody({ onDismiss, onSaved }: ClientAddFormBodyProps) {
             <span className="text-[14px] font-medium text-[var(--foreground)]">
               Платформа
             </span>
-            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
               <button
                 type="button"
                 className={`rounded-xl border px-3 py-2.5 text-[14px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
@@ -317,6 +328,19 @@ function ClientAddFormBody({ onDismiss, onSaved }: ClientAddFormBodyProps) {
                 onClick={() => setField("platform", "instagram")}
               >
                 Instagram
+              </button>
+              <button
+                type="button"
+                className={`rounded-xl border px-3 py-2.5 text-[14px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
+                  values.platform === "facebook"
+                    ? "border-[color-mix(in_srgb,var(--accent)_45%,var(--border))] bg-[var(--surface-elevated)] text-[var(--foreground)]"
+                    : "border-[var(--border)] bg-[var(--background)] text-[var(--muted)] hover:text-[var(--foreground)]"
+                }`}
+                aria-checked={values.platform === "facebook"}
+                role="radio"
+                onClick={() => setField("platform", "facebook")}
+              >
+                Facebook
               </button>
               <button
                 type="button"
@@ -522,6 +546,130 @@ function ClientAddFormBody({ onDismiss, onSaved }: ClientAddFormBodyProps) {
                 >
                   Аккаунт Instagram в режиме Business / Creator, к Facebook Page и к вашему
                   приложению (или Business Manager) он подключён, права согласованы с клиентом
+                </label>
+              </div>
+            </>
+          ) : values.platform === "facebook" ? (
+            <>
+              <div>
+                <label
+                  htmlFor={`${formId}-fbslug`}
+                  className="text-[14px] font-medium text-[var(--foreground)]"
+                >
+                  Короткое имя страницы (vanity URL)
+                </label>
+                <input
+                  id={`${formId}-fbslug`}
+                  name="instagramUsername"
+                  className={`mt-2 ${inputClass}`}
+                  value={values.instagramUsername}
+                  onChange={(e) =>
+                    setField("instagramUsername", stripAt(e.target.value).replace(/\s+/g, ""))
+                  }
+                  required
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  autoComplete="off"
+                  placeholder="как в facebook.com/ваше_имя"
+                />
+                <p className="mt-1 text-[12px] text-[var(--muted)]">
+                  Латиница, цифры и точка — как в публичной ссылке на страницу (без домена).
+                </p>
+              </div>
+
+              <div>
+                <label
+                  htmlFor={`${formId}-fbpageid`}
+                  className="text-[14px] font-medium text-[var(--foreground)]"
+                >
+                  Числовой ID Facebook Page
+                </label>
+                <input
+                  id={`${formId}-fbpageid`}
+                  name="facebookPageId"
+                  className={`mt-2 ${inputClass} font-mono text-[14px]`}
+                  value={values.facebookPageId}
+                  onChange={(e) =>
+                    setField("facebookPageId", e.target.value.replace(/\D/g, ""))
+                  }
+                  required
+                  inputMode="numeric"
+                  autoComplete="off"
+                  placeholder="например из настроек страницы или Graph API"
+                />
+                <p className="mt-1 text-[12px] text-[var(--muted)]">
+                  В Meta Business Suite: «Настройки страницы» → «Название страницы и идентификатор», либо
+                  через <code className="rounded bg-[var(--surface-elevated)] px-1">me/accounts</code> в
+                  Graph API.
+                </p>
+              </div>
+
+              <div>
+                <label
+                  htmlFor={`${formId}-fbbizid`}
+                  className="text-[14px] font-medium text-[var(--foreground)]"
+                >
+                  ID бизнеса в Meta Business Suite (необязательно)
+                </label>
+                <input
+                  id={`${formId}-fbbizid`}
+                  name="instagramBusinessId"
+                  className={`mt-2 ${inputClass} font-mono text-[14px]`}
+                  value={values.instagramBusinessId}
+                  onChange={(e) =>
+                    setField("instagramBusinessId", e.target.value.replace(/\D/g, ""))
+                  }
+                  inputMode="numeric"
+                  autoComplete="off"
+                  placeholder="Business ID из business.facebook.com"
+                />
+                <p className="mt-1 text-[12px] text-[var(--muted)]">
+                  Удобно зафиксировать для справки; для вызова Page API достаточно ID страницы и токена.
+                </p>
+              </div>
+
+              <div>
+                <label
+                  htmlFor={`${formId}-fbtoken`}
+                  className="text-[14px] font-medium text-[var(--foreground)]"
+                >
+                  Page access token
+                </label>
+                <textarea
+                  id={`${formId}-fbtoken`}
+                  name="pageAccessToken"
+                  className={`mt-2 min-h-[4.5rem] resize-y ${inputClass} font-mono text-[12px] leading-normal`}
+                  value={values.pageAccessToken}
+                  onChange={(e) => setField("pageAccessToken", e.target.value)}
+                  required={values.platform === "facebook"}
+                  autoComplete="off"
+                  rows={3}
+                  placeholder="Долгоживущий токен страницы (pages_manage_posts и др.)…"
+                />
+                <p className="mt-1 text-[12px] text-[var(--muted)]">
+                  Сгенерируйте в Graph API Explorer или OAuth-потоке приложения; хранится в БД на сервере.
+                </p>
+              </div>
+
+              <div className="flex gap-3 rounded-xl border border-[var(--border)] bg-[var(--background)] p-3.5">
+                <input
+                  id={`${formId}-fbbiz`}
+                  type="checkbox"
+                  name="businessAccountConfirmed"
+                  value="on"
+                  className="mt-0.5 size-4 shrink-0 cursor-pointer rounded border border-[var(--border)] bg-[var(--surface)] text-[var(--accent)]"
+                  checked={values.businessAccountConfirmed}
+                  onChange={(e) =>
+                    setField("businessAccountConfirmed", e.target.checked)
+                  }
+                />
+                <label
+                  htmlFor={`${formId}-fbbiz`}
+                  className="cursor-pointer text-[13px] leading-snug text-[var(--foreground)]"
+                >
+                  Страница Facebook подключена к бизнес-аккаунту (Business Manager / Meta Business
+                  Suite), приложение добавлено в активы бизнеса и клиент выдал нужные разрешения
                 </label>
               </div>
             </>

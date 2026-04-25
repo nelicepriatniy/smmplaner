@@ -38,6 +38,7 @@ enum ActivityKind {
 
 enum ClientPlatform {
   instagram
+  facebook
   telegram
   vk
 }
@@ -62,6 +63,8 @@ model Client {
   /// JSON array of 1–2 sphere labels
   activitySpheres Json     @map("activity_spheres")
   contact         String?  @db.Text
+  /// Внутренние заметки SMM о клиенте (не для клиента).
+  notes           String?  @db.Text
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 

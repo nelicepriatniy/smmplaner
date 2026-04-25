@@ -1,11 +1,19 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Suspense, useCallback, useMemo, useState, useTransition } from "react";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+} from "react";
 import Link from "next/link";
 import {
   deleteClientAction,
   deleteClientSocialAccountAction,
+  updateClientNotesAction,
 } from "@/app/(main)/clients/actions";
 import { ContentCalendar } from "@/components/calendar/ContentCalendar";
 import { ClientFormDialog } from "@/components/clients/ClientFormDialog";
@@ -13,12 +21,18 @@ import { ClientSocialAccountFormDialog } from "@/components/clients/ClientSocial
 import { useAppNotifications } from "@/components/notifications/AppNotifications";
 import { SocialPlatformIcon } from "@/components/icons/SocialPlatformIcon";
 import type {
+  ClientPlatform,
   ClientRecord,
   ClientSocialAccountRecord,
   PostDraftRecord,
   PostDraftStatus,
 } from "@/domain/smm";
-import { POST_DRAFT_STATUS_LABELS, socialAccountShortLabel } from "@/domain/smm";
+import {
+  ALL_CLIENT_PLATFORMS,
+  clientPlatformName,
+  POST_DRAFT_STATUS_LABELS,
+  socialAccountShortLabel,
+} from "@/domain/smm";
 
 const POST_STATUS_ORDER: PostDraftStatus[] = [
   "draft",
@@ -50,6 +64,50 @@ const btnSm =
 const btnGhostSm =
   "rounded-md border border-transparent px-1.5 py-0.5 text-[11px] font-medium text-[var(--muted)] hover:bg-[var(--border)] hover:text-[var(--foreground)] disabled:opacity-40";
 
+const badgeConnected =
+  "inline-flex shrink-0 items-center rounded-md bg-emerald-500/18 px-2 py-0.5 text-[11px] font-semibold text-emerald-300 ring-1 ring-emerald-500/40";
+
+const badgeDisconnected =
+  "inline-flex shrink-0 items-center rounded-md bg-rose-500/12 px-2 py-0.5 text-[11px] font-semibold text-rose-200/90 ring-1 ring-rose-500/35";
+
+const notesTextareaClass =
+  "mt-2 min-h-[7rem] w-full resize-y rounded-xl border border-[var(--border)] bg-[var(--background)] px-3.5 py-2.5 text-[14px] text-[var(--foreground)] outline-offset-2 focus:border-[color-mix(in_srgb,var(--accent)_50%,var(--border))] focus:ring-2 focus:ring-[var(--accent-soft)]";
+
+function SocialAccountCellLabel({ acc }: { acc: ClientSocialAccountRecord }) {
+  const ig = acc.instagramUsername.trim();
+  const igOk =
+    acc.platform === "instagram" && ig && ig !== "telegram" && ig !== "vk";
+  const fbOk =
+    acc.platform === "facebook" && ig && ig !== "telegram" && ig !== "vk";
+  if (igOk) {
+    return (
+      <a
+        href={`https://www.instagram.com/${encodeURIComponent(ig)}/`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-[var(--accent)] underline-offset-2 hover:underline"
+      >
+        @{ig}
+      </a>
+    );
+  }
+  if (fbOk) {
+    return (
+      <a
+        href={`https://www.facebook.com/${encodeURIComponent(ig)}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-[var(--accent)] underline-offset-2 hover:underline"
+      >
+        {ig}
+      </a>
+    );
+  }
+  return (
+    <span title={socialAccountShortLabel(acc)}>{socialAccountShortLabel(acc)}</span>
+  );
+}
+
 type ClientDetailViewProps = {
   client: ClientRecord;
   clientPosts: PostDraftRecord[];
@@ -75,6 +133,24 @@ export function ClientDetailView({
   const [socialDialogAccount, setSocialDialogAccount] =
     useState<ClientSocialAccountRecord | null>(null);
   const [socialSession, setSocialSession] = useState(0);
+  const [socialInitialPlatform, setSocialInitialPlatform] =
+    useState<ClientPlatform | null>(null);
+  const [notesDraft, setNotesDraft] = useState(() => client.notes ?? "");
+  const [notesSaving, startNotesSave] = useTransition();
+
+  useEffect(() => {
+    setNotesDraft(client.notes ?? "");
+  }, [client.id, client.notes]);
+
+  const accountsByPlatform = useMemo(() => {
+    const m = new Map<ClientPlatform, ClientSocialAccountRecord[]>();
+    for (const p of ALL_CLIENT_PLATFORMS) m.set(p, []);
+    for (const a of client.socialAccounts) {
+      const list = m.get(a.platform);
+      if (list) list.push(a);
+    }
+    return m;
+  }, [client.socialAccounts]);
 
   const postsBySocialId = useMemo(() => {
     const m = new Map<string, number>();
@@ -119,6 +195,15 @@ export function ClientDetailView({
   const openAddSocial = () => {
     setSocialDialogMode("add");
     setSocialDialogAccount(null);
+    setSocialInitialPlatform(null);
+    setSocialSession((s) => s + 1);
+    setSocialDialogOpen(true);
+  };
+
+  const openAddSocialForPlatform = (platform: ClientPlatform) => {
+    setSocialDialogMode("add");
+    setSocialDialogAccount(null);
+    setSocialInitialPlatform(platform);
     setSocialSession((s) => s + 1);
     setSocialDialogOpen(true);
   };
@@ -126,12 +211,28 @@ export function ClientDetailView({
   const openEditSocial = (acc: ClientSocialAccountRecord) => {
     setSocialDialogMode("edit");
     setSocialDialogAccount(acc);
+    setSocialInitialPlatform(null);
     setSocialSession((s) => s + 1);
     setSocialDialogOpen(true);
   };
 
+  const saveNotes = useCallback(() => {
+    const fd = new FormData();
+    fd.append("notes", notesDraft);
+    startNotesSave(async () => {
+      const res = await updateClientNotesAction(client.id, fd);
+      if (!res.ok) {
+        toast({ message: res.error, variant: "error" });
+        return;
+      }
+      toast({ message: "Заметки сохранены", variant: "success" });
+      router.refresh();
+    });
+  }, [client.id, notesDraft, router, toast]);
+
   const closeSocialDialog = useCallback(() => {
     setSocialDialogOpen(false);
+    setSocialInitialPlatform(null);
   }, []);
 
   const removeSocial = useCallback(
@@ -210,6 +311,7 @@ export function ClientDetailView({
         clientFullName={client.fullName}
         account={socialDialogAccount}
         session={socialSession}
+        initialAddPlatform={socialInitialPlatform}
         onSaved={() => router.refresh()}
       />
 
@@ -246,67 +348,110 @@ export function ClientDetailView({
                 <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
                   Соцсети
                 </h2>
-                {client.socialAccounts.length === 0 ? (
-                  <p className="mt-2 text-[12px] text-[var(--muted)]">Нет — «+ Соцсеть»</p>
-                ) : (
-                  <ul className="mt-2 space-y-1.5">
-                    {client.socialAccounts.map((acc) => {
-                      const postN = postsBySocialId.get(acc.id) ?? 0;
-                      const ig = acc.instagramUsername.trim();
-                      const igOk =
-                        acc.platform === "instagram" &&
-                        ig &&
-                        ig !== "telegram" &&
-                        ig !== "vk";
-                      return (
-                        <li
-                          key={acc.id}
-                          className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-[var(--border)] bg-[var(--background)] px-2.5 py-2 text-[12px]"
-                        >
+                <ul className="mt-2 space-y-2">
+                  {ALL_CLIENT_PLATFORMS.map((platform) => {
+                    const accounts = accountsByPlatform.get(platform) ?? [];
+                    const connected = accounts.length > 0;
+                    return (
+                      <li
+                        key={platform}
+                        className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-2.5 py-2"
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
                           <SocialPlatformIcon
-                            platform={acc.platform}
+                            platform={platform}
                             className="size-5 shrink-0"
+                            title={clientPlatformName(platform)}
                           />
-                          <span className="min-w-0 flex-1 truncate font-medium text-[var(--foreground)]">
-                            {igOk ? (
-                              <a
-                                href={`https://www.instagram.com/${encodeURIComponent(ig)}/`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-[var(--accent)] underline-offset-2 hover:underline"
-                              >
-                                @{ig}
-                              </a>
-                            ) : (
-                              <span title={socialAccountShortLabel(acc)}>
-                                {socialAccountShortLabel(acc)}
-                              </span>
-                            )}
+                          <span className="min-w-0 flex-1 text-[13px] font-medium text-[var(--foreground)]">
+                            {clientPlatformName(platform)}
                           </span>
-                          <span className="shrink-0 tabular-nums text-[var(--muted)]">{postN}</span>
-                          <span className="ml-auto flex shrink-0 gap-0.5">
-                            <button
-                              type="button"
-                              className={btnGhostSm}
-                              onClick={() => openEditSocial(acc)}
-                            >
-                              изм.
-                            </button>
-                            <button
-                              type="button"
-                              className={btnGhostSm}
-                              disabled={postN > 0}
-                              title={postN > 0 ? "Есть посты" : undefined}
-                              onClick={() => removeSocial(acc)}
-                            >
-                              уд.
-                            </button>
+                          <span
+                            className={connected ? badgeConnected : badgeDisconnected}
+                            aria-label={connected ? "Подключено" : "Не подключено"}
+                          >
+                            {connected ? "Подключено" : "Не подключено"}
                           </span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
+                        </div>
+                        {connected ? (
+                          <ul className="mt-2 space-y-1 border-t border-[var(--border)] pt-2 pl-0.5">
+                            {accounts.map((acc) => {
+                              const postN = postsBySocialId.get(acc.id) ?? 0;
+                              return (
+                                <li
+                                  key={acc.id}
+                                  className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]"
+                                >
+                                  <span className="min-w-0 flex-1 truncate font-medium text-[var(--foreground)]">
+                                    <SocialAccountCellLabel acc={acc} />
+                                  </span>
+                                  <span className="shrink-0 tabular-nums text-[var(--muted)]">
+                                    {postN}
+                                  </span>
+                                  <span className="ml-auto flex shrink-0 gap-0.5">
+                                    <button
+                                      type="button"
+                                      className={btnGhostSm}
+                                      onClick={() => openEditSocial(acc)}
+                                    >
+                                      изм.
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={btnGhostSm}
+                                      disabled={postN > 0}
+                                      title={postN > 0 ? "Есть посты" : undefined}
+                                      onClick={() => removeSocial(acc)}
+                                    >
+                                      уд.
+                                    </button>
+                                  </span>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        ) : (
+                          <button
+                            type="button"
+                            className="mt-2 text-[12px] font-medium text-[var(--accent)] underline-offset-2 hover:underline"
+                            onClick={() => openAddSocialForPlatform(platform)}
+                          >
+                            Подключить
+                          </button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+
+              <div>
+                <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                  Заметки
+                </h2>
+                <p className="mt-1 text-[11px] leading-snug text-[var(--muted)]">
+                  Видите только вы; сохраняются в базе вместе с карточкой клиента.
+                </p>
+                <textarea
+                  id={`client-notes-${client.id}`}
+                  name="notes"
+                  className={notesTextareaClass}
+                  value={notesDraft}
+                  onChange={(e) => setNotesDraft(e.target.value)}
+                  placeholder="Договорённости, напоминания, доступы, особенности бренда…"
+                  rows={5}
+                  autoComplete="off"
+                />
+                <div className="mt-2 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={saveNotes}
+                    disabled={notesSaving}
+                    className={btnSm}
+                  >
+                    {notesSaving ? "Сохранение…" : "Сохранить заметки"}
+                  </button>
+                </div>
               </div>
 
               <div>

@@ -26,7 +26,15 @@ export function getLastDiscussionComment(
   return [...discussion].sort((a, b) => a.createdAt - b.createdAt).at(-1);
 }
 
-export type ClientPlatform = "instagram" | "telegram" | "vk";
+export type ClientPlatform = "instagram" | "facebook" | "telegram" | "vk";
+
+/** Все платформы, которые можно подключить к клиенту (порядок на карточке). */
+export const ALL_CLIENT_PLATFORMS: readonly ClientPlatform[] = [
+  "instagram",
+  "facebook",
+  "telegram",
+  "vk",
+];
 
 /** Подключённая соцсеть (учётка для публикации). */
 export type ClientSocialAccountRecord = {
@@ -42,6 +50,8 @@ export type ClientSocialAccountRecord = {
   vkOwnerId?: string | null;
   vkFromGroup?: boolean;
   hasVkAccessToken?: boolean;
+  /** Сохранённый Page access token (Instagram / Facebook). */
+  hasPageAccessToken?: boolean;
 };
 
 export type ClientRecord = {
@@ -55,11 +65,14 @@ export type ClientRecord = {
   postsPendingReview: number;
   activitySpheres: [string] | [string, string];
   contact?: string | null;
+  /** Внутренние заметки о клиенте. */
+  notes?: string | null;
 };
 
 /** Краткое имя площадки для списков и иконок. */
 export function clientPlatformName(platform: ClientPlatform): string {
   if (platform === "instagram") return "Instagram";
+  if (platform === "facebook") return "Facebook";
   if (platform === "vk") return "ВКонтакте";
   return "Telegram";
 }
@@ -73,6 +86,13 @@ export function socialAccountShortLabel(account: ClientSocialAccountRecord): str
   if (account.platform === "vk") {
     const wall = account.vkOwnerId?.trim();
     return wall ? `ВКонтакте · ${wall}` : "ВКонтакте";
+  }
+  if (account.platform === "facebook") {
+    const slug = account.instagramUsername.trim();
+    const pid = account.facebookPageId?.trim();
+    if (slug && pid) return `Facebook · ${slug} (id ${pid})`;
+    if (pid) return `Facebook · страница ${pid}`;
+    return "Facebook";
   }
   const ig = account.instagramUsername.trim();
   return ig ? `Instagram · @${ig}` : "Instagram";
@@ -105,6 +125,8 @@ export function postCalendarShortHandle(
   if (!acc) return post.clientId.slice(0, 8);
   if (acc.platform === "telegram") return acc.telegramChatId?.trim() || "TG";
   if (acc.platform === "vk") return acc.vkOwnerId?.trim() || "VK";
+  if (acc.platform === "facebook")
+    return acc.instagramUsername.trim() || acc.facebookPageId?.trim() || "FB";
   return acc.instagramUsername.trim() || "IG";
 }
 
@@ -153,6 +175,8 @@ export function clientCalendarShortHandle(
   if (!acc) return fallbackId;
   if (acc.platform === "telegram") return acc.telegramChatId?.trim() || "TG";
   if (acc.platform === "vk") return acc.vkOwnerId?.trim() || "VK";
+  if (acc.platform === "facebook")
+    return acc.instagramUsername.trim() || acc.facebookPageId?.trim() || "FB";
   return acc.instagramUsername.trim() || "IG";
 }
 

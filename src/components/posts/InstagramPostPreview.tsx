@@ -21,6 +21,18 @@ type InstagramPostPreviewProps = {
 const igFont =
   'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
 
+function publisherAvatarWrapClass(publisher: PostPublisherPreview | null): string {
+  if (publisher?.platform === "facebook") {
+    return "size-8 shrink-0 rounded-full bg-[#1877F2] p-[2px]";
+  }
+  return "size-8 shrink-0 rounded-full bg-gradient-to-br from-[#f09433] via-[#e6683c] to-[#bc1888] p-[2px]";
+}
+
+function storyHandleLabel(publisher: PostPublisherPreview | null, user: string): string {
+  if (publisher?.platform === "facebook") return user;
+  return `@${user}`;
+}
+
 function IcHeart() {
   return (
     <svg
@@ -184,7 +196,7 @@ function InstagramFeedPostPreview({
     >
       <div className="flex h-[52px] min-h-[52px] items-center justify-between border-b border-[#efefef] px-3">
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
-          <div className="size-8 shrink-0 rounded-full bg-gradient-to-br from-[#f09433] via-[#e6683c] to-[#bc1888] p-[2px]">
+          <div className={publisherAvatarWrapClass(publisher)}>
             <div
               className="flex size-full items-center justify-center rounded-full bg-white"
               aria-hidden
@@ -416,7 +428,7 @@ function ReelsOrStoriesFrame({
           </div>
           <div className="absolute z-20 flex w-full items-center justify-between px-2.5 pt-8 pr-2 text-white">
             <p className="text-[12px] font-semibold [text-shadow:0_1px_4px_rgba(0,0,0,0.6)]">
-              @{user}
+              {storyHandleLabel(publisher, user)}
             </p>
             <span className="scale-90 text-white [filter:drop-shadow(0_1px_1px_#000)]">
               <IcMore />
@@ -520,7 +532,9 @@ function ReelsOrStoriesFrame({
             className="absolute right-0 bottom-0 z-20 max-w-[calc(100%-2.75rem)] p-2.5 text-left"
             style={{ textShadow: "0 1px 3px rgba(0,0,0,0.75)" }}
           >
-            <p className="line-clamp-1 text-sm font-bold text-white">@{user}</p>
+            <p className="line-clamp-1 text-sm font-bold text-white">
+              {storyHandleLabel(publisher, user)}
+            </p>
             {cap && (
               <p className="mt-0.5 line-clamp-2 text-xs text-white/90">{cap}</p>
             )}

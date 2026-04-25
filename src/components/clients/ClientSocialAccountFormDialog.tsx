@@ -56,7 +56,8 @@ function vkEntityIdFromAccount(a: ClientSocialAccountRecord): string {
 
 function initialSocialState(
   mode: "add" | "edit",
-  account: ClientSocialAccountRecord | null
+  account: ClientSocialAccountRecord | null,
+  defaultPlatform?: ClientPlatform | null
 ): SocialFormState {
   if (mode === "edit" && account) {
     return {
@@ -75,7 +76,7 @@ function initialSocialState(
     };
   }
   return {
-    platform: "instagram",
+    platform: defaultPlatform ?? "instagram",
     instagramUsername: "",
     instagramBusinessId: "",
     facebookPageId: "",
@@ -95,6 +96,8 @@ type SocialFormBodyProps = {
   clientId: string;
   clientFullName: string;
   account: ClientSocialAccountRecord | null;
+  /** При добавлении соцсети — выбранная по умолчанию платформа. */
+  defaultPlatform?: ClientPlatform | null;
   onDismiss: () => void;
   onSaved?: () => void;
 };
@@ -104,6 +107,7 @@ function SocialFormBody({
   clientId,
   clientFullName,
   account,
+  defaultPlatform = null,
   onDismiss,
   onSaved,
 }: SocialFormBodyProps) {
@@ -111,7 +115,7 @@ function SocialFormBody({
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
   const [values, setValues] = useState<SocialFormState>(() =>
-    initialSocialState(mode, account)
+    initialSocialState(mode, account, defaultPlatform)
   );
   const [isPending, startTransition] = useTransition();
 
@@ -184,7 +188,7 @@ function SocialFormBody({
               <span className="text-[14px] font-medium text-[var(--foreground)]">
                 Платформа
               </span>
-              <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
                 <button
                   type="button"
                   className={`rounded-xl border px-3 py-2.5 text-[14px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
@@ -197,6 +201,19 @@ function SocialFormBody({
                   onClick={() => setField("platform", "instagram")}
                 >
                   Instagram
+                </button>
+                <button
+                  type="button"
+                  className={`rounded-xl border px-3 py-2.5 text-[14px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
+                    values.platform === "facebook"
+                      ? "border-[color-mix(in_srgb,var(--accent)_45%,var(--border))] bg-[var(--surface-elevated)] text-[var(--foreground)]"
+                      : "border-[var(--border)] bg-[var(--background)] text-[var(--muted)] hover:text-[var(--foreground)]"
+                  }`}
+                  aria-checked={values.platform === "facebook"}
+                  role="radio"
+                  onClick={() => setField("platform", "facebook")}
+                >
+                  Facebook
                 </button>
                 <button
                   type="button"
@@ -351,6 +368,118 @@ function SocialFormBody({
                   className="cursor-pointer text-[13px] leading-snug text-[var(--foreground)]"
                 >
                   Business / Creator, страница и права согласованы
+                </label>
+              </div>
+            </>
+          ) : values.platform === "facebook" ? (
+            <>
+              <div>
+                <label
+                  htmlFor={`${formId}-fbslug`}
+                  className="text-[14px] font-medium text-[var(--foreground)]"
+                >
+                  Короткое имя страницы (vanity URL)
+                </label>
+                <input
+                  id={`${formId}-fbslug`}
+                  name="instagramUsername"
+                  className={`mt-2 ${inputClass}`}
+                  value={values.instagramUsername}
+                  onChange={(e) =>
+                    setField("instagramUsername", stripAt(e.target.value).replace(/\s+/g, ""))
+                  }
+                  required
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  autoComplete="off"
+                  placeholder="как в facebook.com/…"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor={`${formId}-fbpageid`}
+                  className="text-[14px] font-medium text-[var(--foreground)]"
+                >
+                  Числовой ID Facebook Page
+                </label>
+                <input
+                  id={`${formId}-fbpageid`}
+                  name="facebookPageId"
+                  className={`mt-2 ${inputClass} font-mono text-[14px]`}
+                  value={values.facebookPageId}
+                  onChange={(e) =>
+                    setField("facebookPageId", e.target.value.replace(/\D/g, ""))
+                  }
+                  required
+                  inputMode="numeric"
+                  autoComplete="off"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor={`${formId}-fbbizid`}
+                  className="text-[14px] font-medium text-[var(--foreground)]"
+                >
+                  ID бизнеса в Meta Business Suite (необязательно)
+                </label>
+                <input
+                  id={`${formId}-fbbizid`}
+                  name="instagramBusinessId"
+                  className={`mt-2 ${inputClass} font-mono text-[14px]`}
+                  value={values.instagramBusinessId}
+                  onChange={(e) =>
+                    setField("instagramBusinessId", e.target.value.replace(/\D/g, ""))
+                  }
+                  inputMode="numeric"
+                  autoComplete="off"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor={`${formId}-fbtoken`}
+                  className="text-[14px] font-medium text-[var(--foreground)]"
+                >
+                  Page access token
+                </label>
+                <textarea
+                  id={`${formId}-fbtoken`}
+                  name="pageAccessToken"
+                  className={`mt-2 min-h-[4.5rem] resize-y ${inputClass} font-mono text-[12px] leading-normal`}
+                  value={values.pageAccessToken}
+                  onChange={(e) => setField("pageAccessToken", e.target.value)}
+                  required={mode === "add" || !account?.hasPageAccessToken}
+                  autoComplete="off"
+                  rows={3}
+                  placeholder={
+                    mode === "edit"
+                      ? "Оставьте пустым, чтобы не менять токен"
+                      : "Долгоживущий токен страницы…"
+                  }
+                />
+                {mode === "edit" && account?.hasPageAccessToken ? (
+                  <p className="mt-1 text-[12px] text-[var(--muted)]">
+                    Оставьте пустым, чтобы не менять сохранённый токен.
+                  </p>
+                ) : null}
+              </div>
+              <div className="flex gap-3 rounded-xl border border-[var(--border)] bg-[var(--background)] p-3.5">
+                <input
+                  id={`${formId}-fbbizchk`}
+                  type="checkbox"
+                  name="businessAccountConfirmed"
+                  value="on"
+                  className="mt-0.5 size-4 shrink-0 cursor-pointer rounded border border-[var(--border)] bg-[var(--surface)] text-[var(--accent)]"
+                  checked={values.businessAccountConfirmed}
+                  onChange={(e) =>
+                    setField("businessAccountConfirmed", e.target.checked)
+                  }
+                />
+                <label
+                  htmlFor={`${formId}-fbbizchk`}
+                  className="cursor-pointer text-[13px] leading-snug text-[var(--foreground)]"
+                >
+                  Страница в Business Manager, доступы приложения согласованы с клиентом
                 </label>
               </div>
             </>
@@ -517,6 +646,8 @@ export type ClientSocialAccountFormDialogProps = {
   clientFullName: string;
   account: ClientSocialAccountRecord | null;
   session: number;
+  /** Только для mode add: заранее выбранная платформа (кнопка «Подключить» на карточке). */
+  initialAddPlatform?: ClientPlatform | null;
   onSaved?: () => void;
 };
 
@@ -528,6 +659,7 @@ export function ClientSocialAccountFormDialog({
   clientFullName,
   account,
   session,
+  initialAddPlatform = null,
   onSaved,
 }: ClientSocialAccountFormDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -562,6 +694,7 @@ export function ClientSocialAccountFormDialog({
               clientId={clientId}
               clientFullName={clientFullName}
               account={account}
+              defaultPlatform={mode === "add" ? initialAddPlatform : null}
               onDismiss={onRequestClose}
               onSaved={onSaved}
             />

@@ -54,6 +54,7 @@ export function toSocialAccountRecord(
     vkOwnerId: row.vkOwnerId ?? undefined,
     vkFromGroup: row.vkFromGroup,
     hasVkAccessToken: Boolean(row.vkAccessToken?.trim()),
+    hasPageAccessToken: Boolean(row.pageAccessToken?.trim()),
   };
 }
 
@@ -132,6 +133,7 @@ function enrichClientRecord(
     postsPendingReview,
     activitySpheres: spheresTuple(c.activitySpheres),
     contact: c.contact ?? undefined,
+    notes: c.notes ?? undefined,
   };
 }
 
@@ -252,6 +254,7 @@ export async function getClientRecordById(
     postsPendingReview: 0,
     activitySpheres: spheresTuple(row.activitySpheres),
     contact: row.contact ?? undefined,
+    notes: row.notes ?? undefined,
   };
 }
 

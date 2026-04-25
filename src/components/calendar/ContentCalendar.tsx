@@ -391,7 +391,9 @@ export function ContentCalendar({
                 ? `TG ${label}`
                 : platform === "vk"
                   ? `VK ${label}`
-                  : `@${label}`;
+                  : platform === "facebook"
+                    ? `FB ${label}`
+                    : `@${label}`;
             const title = showClientInSlot
               ? `${timePart} · ${clientSlot}\n${captionLine}`
               : `${timePart}\n${captionLine}`;
@@ -411,6 +413,8 @@ export function ContentCalendar({
                     <span className="text-[var(--foreground)]">
                       {platform === "instagram" ? (
                         <> @{label}</>
+                      ) : platform === "facebook" ? (
+                        <> FB · {label}</>
                       ) : (
                         <> {label}</>
                       )}

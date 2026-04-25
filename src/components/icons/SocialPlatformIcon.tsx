@@ -2,6 +2,7 @@ import type { ClientPlatform } from "@/domain/smm";
 
 const ASSET_PATH: Record<ClientPlatform, string> = {
   instagram: "/assets/icons/instagramLogo.svg",
+  facebook: "/assets/icons/facebook-Logo.svg",
   vk: "/assets/icons/VKLogo.svg",
   telegram: "/assets/icons/telegramLogo.svg",
 };

@@ -4,7 +4,12 @@ import {
   type PostDraftStatus,
 } from "@/domain/smm";
 
-const PLATFORMS: readonly ClientPlatform[] = ["instagram", "telegram", "vk"];
+const PLATFORMS: readonly ClientPlatform[] = [
+  "instagram",
+  "facebook",
+  "telegram",
+  "vk",
+];
 
 const ALL_STATUSES: PostDraftStatus[] = [
   "draft",
@@ -63,6 +68,7 @@ export const CALENDAR_PLATFORM_OPTIONS: readonly {
   label: string;
 }[] = [
   { id: "instagram", label: "Instagram" },
+  { id: "facebook", label: "Facebook" },
   { id: "telegram", label: "Telegram" },
   { id: "vk", label: "ВКонтакте" },
 ];

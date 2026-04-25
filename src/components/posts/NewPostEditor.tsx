@@ -191,6 +191,8 @@ export function NewPostEditor({
   );
 
   const publishPlatform: ClientPlatform = selectedAccount?.platform ?? "instagram";
+  const graphFeedEditor =
+    publishPlatform === "instagram" || publishPlatform === "facebook";
 
   const publisher = useMemo(
     () => toPostPublisherPreview(selectedClient, selectedAccount),
@@ -542,7 +544,7 @@ export function NewPostEditor({
             </>
           )}
 
-          {publishPlatform === "instagram" ? (
+          {graphFeedEditor ? (
             <div>
               <label
                 htmlFor="post-type"
@@ -631,7 +633,7 @@ export function NewPostEditor({
             />
           </div>
 
-          {publishPlatform === "instagram" ? (
+          {graphFeedEditor ? (
             <>
               <div>
                 <label
@@ -685,7 +687,8 @@ export function NewPostEditor({
                   Описание для людей с ограничениями (alt)
                 </label>
                 <p className="mt-1 text-[13px] text-[var(--muted)]">
-                  В ленте не отображается, но важно для Instagram.
+                  В ленте не отображается, но важно для доступности (
+                  {publishPlatform === "facebook" ? "Facebook" : "Instagram"}).
                 </p>
                 <input
                   id="post-alt"
@@ -794,7 +797,9 @@ export function NewPostEditor({
             ? "Предпросмотр в стиле Telegram"
             : publishPlatform === "vk"
               ? "Предпросмотр записи на стене (упрощённо)"
-              : "Предпросмотр в стиле Instagram"
+              : publishPlatform === "facebook"
+                ? "Предпросмотр публикации на странице Facebook"
+                : "Предпросмотр в стиле Instagram"
         }
       >
         <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
@@ -805,12 +810,16 @@ export function NewPostEditor({
             ? "Канал / чат: шапка, медиа и подпись, как в типичном посте Telegram."
             : publishPlatform === "vk"
               ? "Упрощённый вид: шапка с названием клиента и owner_id, медиа и текст (как у записи на стене)."
-              : postType === "feed" && "Лента, светлая тема, карточка 4:5."}
-          {publishPlatform === "instagram" && postType === "photo" &&
+              : postType === "feed"
+                ? publishPlatform === "facebook"
+                  ? "Лента страницы Facebook (упрощённый вид, карточка 4:5)."
+                  : "Лента, светлая тема, карточка 4:5."
+                : null}
+          {graphFeedEditor && postType === "photo" &&
             "Тот же вид ленты, квадратный кадр 1:1."}
-          {publishPlatform === "instagram" && postType === "reels" &&
+          {graphFeedEditor && postType === "reels" &&
             "Полотно 9:16, панель действий справа, подпись внизу."}
-          {publishPlatform === "instagram" && postType === "stories" &&
+          {graphFeedEditor && postType === "stories" &&
             "9:16, прогресс, ник, текст и поле «Сообщение» внизу."}
         </p>
         <div
@@ -848,7 +857,9 @@ export function NewPostEditor({
               ? "Когда отправить материалы в Telegram или поставить напоминание"
               : publishPlatform === "vk"
                 ? "Когда опубликовать во ВКонтакте или поставить напоминание"
-                : "Когда выкладывать в ленту или поставить напоминание"}
+                : publishPlatform === "facebook"
+                  ? "Когда опубликовать на странице Facebook или поставить напоминание"
+                  : "Когда выкладывать в ленту или поставить напоминание"}
           </p>
           <div className="mt-3 flex flex-row items-stretch gap-3">
             <div className="min-w-0 flex-1">

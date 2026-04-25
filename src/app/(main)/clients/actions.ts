@@ -12,6 +12,7 @@ function parsePlatform(raw: string): DbClientPlatform {
   const x = raw.toLowerCase();
   if (x === "telegram") return "telegram";
   if (x === "vk") return "vk";
+  if (x === "facebook") return "facebook";
   return "instagram";
 }
 
@@ -127,6 +128,51 @@ function parseFirstSocialAccountFromForm(
     };
   }
 
+  if (platform === "facebook") {
+    const pageSlug = String(formData.get("instagramUsername") ?? "")
+      .trim()
+      .replace(/^@+/, "")
+      .replace(/\s+/g, "");
+    if (!pageSlug) {
+      return {
+        ok: false,
+        error: "Укажите короткое имя страницы (vanity URL), как в ссылке facebook.com/…",
+      };
+    }
+    if (pageSlug === TG_INSTAGRAM_PLACEHOLDER || pageSlug === VK_INSTAGRAM_PLACEHOLDER) {
+      return { ok: false, error: "Некорректное имя страницы Facebook." };
+    }
+    const facebookPageId =
+      String(formData.get("facebookPageId") ?? "").replace(/\D/g, "") || null;
+    if (!facebookPageId) {
+      return { ok: false, error: "Укажите числовой ID Facebook Page." };
+    }
+    const pageAccessTokenRaw = String(formData.get("pageAccessToken") ?? "").trim();
+    const pageAccessToken = pageAccessTokenRaw || null;
+    if (!pageAccessToken) {
+      return { ok: false, error: "Укажите Page access token (долгоживущий, с нужными scope)." };
+    }
+    const instagramBusinessId =
+      String(formData.get("instagramBusinessId") ?? "").replace(/\D/g, "") || null;
+    const businessAccountConfirmed = formData.get("businessAccountConfirmed") === "on";
+    return {
+      ok: true,
+      data: {
+        platform: "facebook",
+        instagramUsername: pageSlug,
+        instagramBusinessId,
+        facebookPageId,
+        pageAccessToken,
+        businessAccountConfirmed,
+        telegramBotToken: null,
+        telegramChatId: null,
+        vkAccessToken: null,
+        vkOwnerId: null,
+        vkFromGroup: false,
+      },
+    };
+  }
+
   const instagramUsername = String(formData.get("instagramUsername") ?? "")
     .trim()
     .replace(/^@+/, "");
@@ -189,7 +235,9 @@ export async function createClientAction(
       ? `${fullName} (Telegram, чат ${s.telegramChatId})`
       : s.platform === "vk"
         ? `${fullName} (ВКонтакте, стена ${s.vkOwnerId})`
-        : `${fullName} (@${s.instagramUsername})`;
+        : s.platform === "facebook"
+          ? `${fullName} (Facebook Page ${s.facebookPageId}, ${s.instagramUsername})`
+          : `${fullName} (@${s.instagramUsername})`;
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -284,6 +332,36 @@ export async function updateClientAction(
   }
 }
 
+export async function updateClientNotesAction(
+  clientId: string,
+  formData: FormData
+): Promise<ClientActionResult> {
+  const userId = await requireUserId();
+  if (!userId) return { ok: false, error: "Нужна авторизация." };
+
+  const existing = await prisma.client.findFirst({
+    where: { id: clientId, userId },
+    select: { id: true },
+  });
+  if (!existing) return { ok: false, error: "Клиент не найден." };
+
+  const notesRaw = String(formData.get("notes") ?? "");
+  const notes = notesRaw.trim() || null;
+
+  try {
+    await prisma.client.update({
+      where: { id: clientId },
+      data: { notes },
+    });
+    revalidatePath("/clients");
+    revalidatePath(`/clients/${clientId}`);
+    return { ok: true };
+  } catch (e) {
+    console.error(e);
+    return { ok: false, error: "Не удалось сохранить заметки." };
+  }
+}
+
 export async function addClientSocialAccountAction(
   clientId: string,
   formData: FormData
@@ -358,6 +436,35 @@ export async function updateClientSocialAccountAction(
     const pageAccessTokenRaw = String(formData.get("pageAccessToken") ?? "").trim();
     if (pageAccessTokenRaw) {
       data.pageAccessToken = pageAccessTokenRaw;
+    }
+  } else if (platform === "facebook") {
+    const pageSlug = String(formData.get("instagramUsername") ?? "")
+      .trim()
+      .replace(/^@+/, "")
+      .replace(/\s+/g, "");
+    if (!pageSlug) {
+      return {
+        ok: false,
+        error: "Укажите короткое имя страницы (vanity URL), как в ссылке facebook.com/…",
+      };
+    }
+    if (pageSlug === TG_INSTAGRAM_PLACEHOLDER || pageSlug === VK_INSTAGRAM_PLACEHOLDER) {
+      return { ok: false, error: "Некорректное имя страницы Facebook." };
+    }
+    data.instagramUsername = pageSlug;
+    const fbPageId = String(formData.get("facebookPageId") ?? "").replace(/\D/g, "") || null;
+    if (!fbPageId) {
+      return { ok: false, error: "Укажите числовой ID Facebook Page." };
+    }
+    data.facebookPageId = fbPageId;
+    data.instagramBusinessId =
+      String(formData.get("instagramBusinessId") ?? "").replace(/\D/g, "") || null;
+    data.businessAccountConfirmed = formData.get("businessAccountConfirmed") === "on";
+    const pageAccessTokenRaw = String(formData.get("pageAccessToken") ?? "").trim();
+    if (pageAccessTokenRaw) {
+      data.pageAccessToken = pageAccessTokenRaw;
+    } else if (!existing.pageAccessToken?.trim()) {
+      return { ok: false, error: "Укажите Page access token." };
     }
   } else if (platform === "telegram") {
     const telegramChatId = String(formData.get("telegramChatId") ?? "").trim() || null;
