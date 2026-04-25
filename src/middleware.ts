@@ -21,8 +21,8 @@ export default auth((request) => {
       return NextResponse.next();
     }
     if (
-      pathname === "/api/uploads/view" ||
-      pathname.startsWith("/api/uploads/view/")
+      pathname === "/api/uploads/media" ||
+      pathname.startsWith("/api/uploads/media/")
     ) {
       return NextResponse.next();
     }

@@ -46,14 +46,15 @@ function isAppUploadPath(pathname: string): boolean {
   return pathname.startsWith("/uploads/");
 }
 
+const UPLOAD_POST_WEB_PATH =
+  /^\/uploads\/posts\/[a-z0-9_-]+\/[a-z0-9_.-]+$/i;
+
 /**
- * Старые загрузки с расширением `.bin` отдаются как `application/octet-stream` из `public/` —
- * в `<img>` не показываются. Подменяем на API, который отдаёт байты с корректным `Content-Type`
- * по сигнатуре файла.
+ * Отдаём загрузки через `/api/uploads/media`: тот же процесс, что пишет файлы при POST,
+ * и корректный `Content-Type` (в т.ч. для старых `.bin`). Обходит проблемы nginx/статики.
  */
-export function rewriteBinUploadImageUrl(url: string): string {
+export function rewritePublicUploadMediaSrc(url: string): string {
   const s = url.trim();
-  if (!s.toLowerCase().endsWith(".bin")) return s;
   let pathname: string;
   let originPrefix = "";
   try {
@@ -71,8 +72,8 @@ export function rewriteBinUploadImageUrl(url: string): string {
   } catch {
     return s;
   }
-  if (!pathname.toLowerCase().startsWith("/uploads/posts/")) return s;
-  const api = `/api/uploads/view?p=${encodeURIComponent(pathname)}`;
+  if (!UPLOAD_POST_WEB_PATH.test(pathname)) return s;
+  const api = `/api/uploads/media?p=${encodeURIComponent(pathname)}`;
   return originPrefix ? `${originPrefix}${api}` : api;
 }
 
@@ -124,7 +125,7 @@ export function toAbsoluteMediaSrc(
     }
   }
 
-  return rewriteBinUploadImageUrl(resolved);
+  return rewritePublicUploadMediaSrc(resolved);
 }
 
 export function toAbsoluteMediaUrls(
