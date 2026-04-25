@@ -1,0 +1,19 @@
+# Локальный PostgreSQL на localhost:5433 (как в типичном SSH-туннеле из .env.example).
+# Запуск: POSTGRES_PASSWORD=ваш_пароль docker compose up -d
+# Пароль должен совпадать с пользователем smmplaner_app в DATABASE_URL.
+# Затем: npm run db:migrate:deploy && npm run db:seed
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: smmplaner_app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD when starting compose}
+      POSTGRES_DB: smmplaner
+    volumes:
+      - smmplaner_pgdata:/var/lib/postgresql/data
+
+volumes:
+  smmplaner_pgdata:

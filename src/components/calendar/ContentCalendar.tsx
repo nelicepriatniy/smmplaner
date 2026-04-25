@@ -257,7 +257,7 @@ export function ContentCalendar({
 
       {filtersSlot ? (
         <div className="flex min-w-0 flex-col gap-6 lg:flex-row lg:items-stretch lg:gap-6">
-          <aside className="flex w-full shrink-0 flex-col self-stretch min-h-0 lg:sticky lg:top-5 lg:w-[13.5rem] lg:min-w-0 xl:w-[15rem]">
+          <aside className="flex w-full shrink-0 flex-col self-stretch min-h-0 lg:w-[13.5rem] lg:min-w-0 xl:w-[15rem]">
             {filtersSlot}
           </aside>
           <div className="min-w-0 flex-1 lg:min-h-0">{calendarGrid}</div>

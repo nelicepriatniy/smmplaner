@@ -16,9 +16,17 @@ const sectionTitle =
 
 type CalendarPageFiltersProps = {
   clientOptions: PostsClientFilterOption[];
+  /**
+   * `true` (по умолчанию) — колонка тянется по высоте, кнопка сброса внизу (календарь + sticky aside).
+   * `false` — компактная колонка без flex-растяжения, скролл вместе со страницей (актуальные посты).
+   */
+  fillColumn?: boolean;
 };
 
-export function CalendarPageFilters({ clientOptions }: CalendarPageFiltersProps) {
+export function CalendarPageFilters({
+  clientOptions,
+  fillColumn = true,
+}: CalendarPageFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -85,7 +93,11 @@ export function CalendarPageFilters({ clientOptions }: CalendarPageFiltersProps)
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div
+      className={
+        fillColumn ? "flex min-h-0 flex-1 flex-col" : "flex flex-col gap-3"
+      }
+    >
       <div className="shrink-0 space-y-3.5">
         <div role="group" aria-label="Клиенты">
         <h3 className={sectionTitle}>Клиенты</h3>
@@ -178,7 +190,7 @@ export function CalendarPageFilters({ clientOptions }: CalendarPageFiltersProps)
         </div>
       </div>
 
-      <div className="min-h-0 flex-1" aria-hidden />
+      {fillColumn ? <div className="min-h-0 flex-1" aria-hidden /> : null}
 
       {hasFilters ? (
         <button
