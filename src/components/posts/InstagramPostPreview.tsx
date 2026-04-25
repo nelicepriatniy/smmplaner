@@ -7,6 +7,7 @@ import {
   postPreviewAuthorUsername,
   type PostPublisherPreview,
 } from "@/domain/smm";
+import { rewritePublicUploadMediaSrc } from "@/lib/media-display";
 
 type InstagramPostPreviewProps = {
   postType: PostType;
@@ -161,6 +162,10 @@ function InstagramFeedPostPreview({
 }: FeedProps) {
   const [slide, setSlide] = useState(0);
   const n = imageUrls.length;
+  const displayUrls = useMemo(
+    () => imageUrls.map((u) => rewritePublicUploadMediaSrc(u)),
+    [imageUrls],
+  );
   const username = postPreviewAuthorUsername(publisher);
 
   const fullCaption = useMemo(
@@ -186,7 +191,7 @@ function InstagramFeedPostPreview({
   }, [isLong, fullCaption]);
 
   const hasImages = n > 0;
-  const activeUrl = n > 0 ? imageUrls[Math.min(slide, n - 1)]! : null;
+  const activeUrl = n > 0 ? displayUrls[Math.min(slide, n - 1)]! : null;
   const aspectClass = aspect === "photo" ? "aspect-square" : "aspect-[4/5]";
 
   return (
@@ -371,9 +376,13 @@ function ReelsOrStoriesFrame({
 }: VertProps) {
   const [slide, setSlide] = useState(0);
   const n = imageUrls.length;
+  const displayUrls = useMemo(
+    () => imageUrls.map((u) => rewritePublicUploadMediaSrc(u)),
+    [imageUrls],
+  );
   const user = postPreviewAuthorUsername(publisher);
   const hasImg = n > 0;
-  const url = hasImg ? imageUrls[Math.min(slide, n - 1)]! : null;
+  const url = hasImg ? displayUrls[Math.min(slide, n - 1)]! : null;
   const cap = caption.trim();
   const storyText = (cap || firstComment.trim() || "Текст…").slice(0, 220);
   const seg = Math.max(1, n);

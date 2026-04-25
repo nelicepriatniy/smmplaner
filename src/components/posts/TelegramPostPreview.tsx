@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { PostPublisherPreview } from "@/domain/smm";
+import { rewritePublicUploadMediaSrc } from "@/lib/media-display";
 
 type TelegramPostPreviewProps = {
   publisher: PostPublisherPreview | null;
@@ -29,13 +30,17 @@ export function TelegramPostPreview({
         ? `чат ${publisher.telegramChatId.trim()}`
         : "Telegram";
 
+  const displayUrls = useMemo(
+    () => imageUrls.map((u) => rewritePublicUploadMediaSrc(u)),
+    [imageUrls],
+  );
   const key = useMemo(() => imageUrls.join("\0"), [imageUrls]);
   useEffect(() => {
     setSlide(0);
   }, [key]);
 
   const cap = caption.trim();
-  const active = n > 0 ? imageUrls[Math.min(slide, n - 1)]! : null;
+  const active = n > 0 ? displayUrls[Math.min(slide, n - 1)]! : null;
 
   return (
     <div
@@ -79,9 +84,9 @@ export function TelegramPostPreview({
 
         {n > 1 ? (
           <div className="flex gap-1 overflow-x-auto border-b border-[#e4e6eb] px-2 py-2">
-            {imageUrls.map((url, i) => (
+            {displayUrls.map((url, i) => (
               <button
-                key={`${url}-${i}`}
+                key={`${imageUrls[i]}-${i}`}
                 type="button"
                 onClick={() => setSlide(i)}
                 className={`relative size-14 shrink-0 overflow-hidden rounded-md ring-2 ring-offset-1 ring-offset-white ${
